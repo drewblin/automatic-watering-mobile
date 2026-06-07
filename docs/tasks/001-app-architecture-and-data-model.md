@@ -221,8 +221,10 @@ State management має відповідати поточному стилю п�
 
 ## Орієнтовні наступні задачі
 
-Після завершення цієї задачі логічно переходити до:
+Після завершення цієї задачі рухаємося по реальному шляху підключення, без мокових або демо-даних:
 
-- Controller API client;
-- Device connection flow через збережені IP/token;
-- перший read-only Plan screen із моковою або локальною схемою.
+1. `002 BLE discovery and pairing` - сканування `Automatic Watering Hub`, підключення, pairing, базове читання BLE characteristics і збереження BLE device id.
+2. `003 Wi-Fi provisioning over BLE` - читання поточних Wi-Fi settings, запис SSID/password, обробка `restartScheduled`, очікування reboot і повторне підключення через BLE.
+3. `004 Controller access bootstrap` - читання `WifiIpAddress` і `ApiAccessToken` через BLE, збереження IP/token, перевірка локального HTTPS доступу.
+4. `005 Controller settings sync` - `GET /api/settings`, parsing settings snapshot, побудова device objects із settings і збереження актуального стану конфігурації.
+5. `006 Initial plan setup from real settings` - створення першої схеми на основі реальних valves, soil sensors і water counters; користувач розміщує реальні об'єкти, а не mock markers.
