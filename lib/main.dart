@@ -1,37 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const AutomaticWateringApp());
-}
+import 'app/app_state.dart';
+import 'app/automatic_watering_app.dart';
+import 'storage/local_watering_hub_storage.dart';
+import 'storage/secure_watering_hub_token_storage.dart';
 
-class AutomaticWateringApp extends StatelessWidget {
-  const AutomaticWateringApp({super.key});
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final preferences = await SharedPreferences.getInstance();
+  final appController = AppController(
+    wateringHubStorage: SharedPreferencesWateringHubStorage(preferences),
+    tokenStorage: const SecureWateringHubTokenStorage(FlutterSecureStorage()),
+  );
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Automatic Watering',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Automatic Watering'),
-      ),
-      body: const Center(
-        child: Text('Automatic watering mobile app'),
-      ),
-    );
-  }
+  runApp(AutomaticWateringApp(appController: appController));
 }
