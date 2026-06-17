@@ -195,6 +195,8 @@ UI має:
 - дати повернутися до Wi-Fi provisioning;
 - після успіху перейти до синхронізації settings або головного стану "потрібне базове налаштування".
 
+Усі видимі користувачу тексти bootstrap step мають бути українською мовою: стани, кнопки, пояснення, помилки IP `0.0.0.0`, timeout, TLS/fingerprint error і `401`. Технічні значення token, HTTP status codes, API paths і fingerprint не перекладаються.
+
 ## Не входить у задачу
 
 - повний parsing `GET /api/settings`;
@@ -220,5 +222,6 @@ UI має:
 - IP `0.0.0.0` не вважається успішним доступом;
 - `401` переводить state у `tokenInvalid` або `requiresBleRecovery`;
 - token/auth headers не логуються і не показуються в UI;
+- bootstrap UI не містить англомовних user-facing текстів;
 - проєкт проходить `flutter analyze`;
 - тести покривають token storage contract, IP validation і state transitions bootstrap flow.

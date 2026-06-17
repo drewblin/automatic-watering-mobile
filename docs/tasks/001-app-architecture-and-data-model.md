@@ -280,6 +280,8 @@ State management має відповідати поточному стилю п�
 
 Це потрібно тільки для перевірки, що моделі, storage і app state під'єднані до Flutter tree.
 
+Усі user-facing тексти, які з'являються в базовому UI або app shell, мають бути українською мовою. Технічні JSON keys, enum values, API paths і storage keys лишаються мовою контракту.
+
 ## Не входить у задачу
 
 - BLE scan/pairing;
@@ -304,5 +306,6 @@ State management має відповідати поточному стилю п�
 - є storage abstraction для active `WateringHub` і plan schema;
 - `apiAccessToken` зберігається persistently тільки в secure storage, а в `WateringHub` заповнюється in-memory під час старту;
 - root app може завантажити локальний state і показати мінімальний стан пристрою;
+- усі видимі користувачу тексти root widget/app shell українською мовою;
 - проєкт проходить `flutter analyze`;
 - існуючі тести не зламані або оновлені під новий root UI.

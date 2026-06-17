@@ -134,6 +134,8 @@ UI не повинен напряму працювати з класами BLE-�
 
 UI має явно відрізняти стани "нічого не знайдено", "Bluetooth вимкнений", "немає дозволу" і "помилка підключення".
 
+Усі видимі користувачу тексти onboarding screen мають бути українською мовою: заголовки, кнопки, підказки, порожні стани, validation errors і user-facing BLE errors. Технічні назви BLE device/service/characteristics, UUID і firmware contract values не перекладаються.
+
 ### 6. Збереження BLE device id
 
 Після успішного підключення/pairing потрібно:
@@ -168,6 +170,7 @@ UI має явно відрізняти стани "нічого не знайд
 - реалізовано connect/pairing flow із 6-значним passkey або системним pairing;
 - після успішного pairing локально зберігається `bleDeviceId` в активному `WateringHub`;
 - onboarding UI показує реальні стани scan/connect/pairing;
+- onboarding UI не містить англомовних user-facing текстів;
 - помилки не містять Wi-Fi password, API token або інших секретів;
 - проєкт проходить `flutter analyze`;
 - додані або оновлені тести для BLE state/service abstraction там, де це можливо без реального BLE hardware.

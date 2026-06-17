@@ -193,6 +193,8 @@ UI має:
 - давати повернутися до BLE discovery, якщо BLE-з'єднання втрачено;
 - не показувати password після успішного збереження.
 
+Усі видимі користувачу тексти Wi-Fi provisioning step мають бути українською мовою: labels, placeholders, validation errors, кнопки, порожні стани, progress і user-facing errors. Технічні поля `ssid`, `password`, BLE characteristic names і JSON contract values не перекладаються.
+
 ## Не входить у задачу
 
 - читання `apiAccessToken`;
@@ -217,5 +219,6 @@ UI має:
 - після reboot додаток може повторно знайти і підключити той самий BLE device;
 - після повторного BLE-підключення flow переходить до задачі 004 для читання IP/token, а не вважає onboarding завершеним;
 - password не зберігається локально і не потрапляє в logs/errors;
+- Wi-Fi provisioning UI не містить англомовних user-facing текстів;
 - проєкт проходить `flutter analyze`;
 - тести покривають validation і state transitions Wi-Fi provisioning flow.

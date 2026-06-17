@@ -111,4 +111,15 @@ class AppController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> saveActiveWateringHub(WateringHub hub) async {
+    await _wateringHubStorage.saveActiveWateringHub(hub);
+    _state = _state.copyWith(
+      startupStatus: AppStartupStatus.ready,
+      activeWateringHub: hub,
+      connectionState: WateringHubConnectionState.offline,
+      clearLastError: true,
+    );
+    notifyListeners();
+  }
 }

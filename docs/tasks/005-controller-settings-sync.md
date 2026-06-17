@@ -232,6 +232,8 @@ UI не повинен сам викликати HTTP client і парсити J
 
 Повноцінні екрани `Plan`, `Zones` і `Settings` не входять у цю задачу, але після sync має бути зрозуміло, чи можна переходити до створення початкової схеми.
 
+Усі видимі користувачу тексти minimal UI integration мають бути українською мовою: статуси sync, configuration state, кнопки, labels, empty/error states і пояснення. Технічні назви settings fields, API paths, JSON keys і enum values не перекладаються.
+
 ## Не входить у задачу
 
 - `PUT /api/settings`;
@@ -258,6 +260,7 @@ UI не повинен сам викликати HTTP client і парсити J
 - з settings будуються стабільні `DeviceObject` для valves, soil sensors, pressure sensor і water counters;
 - app state містить latest settings тільки in-memory, device objects, sync state і configuration state;
 - settings snapshot не зберігається в local storage/persistent cache;
+- settings sync UI не містить англомовних user-facing текстів;
 - configuration completeness state відрізняє `unknown`/`ready`/`incomplete`/`invalid`;
 - settings sync state відрізняє `idle`/`syncing`/`synced`/`failed`;
 - UI показує мінімальний результат sync і дає повторити sync;
