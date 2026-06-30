@@ -5,6 +5,7 @@ import 'package:automatic_watering_mobile/app/automatic_watering_app.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
+import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 void main() {
@@ -57,6 +58,9 @@ class FakeBleService implements BleService {
   Future<void> connect(BleDiscoveredDevice device) async {}
 
   @override
+  Future<void> reconnect(BleDiscoveredDevice device) async {}
+
+  @override
   Future<BleDeviceServices> pairAndDiscoverServices({
     required BleDiscoveredDevice device,
     required String passkey,
@@ -78,6 +82,19 @@ class FakeBleService implements BleService {
       hasAutomaticWateringService: true,
       discoveredCharacteristicUuids: const {},
     );
+  }
+
+  @override
+  Future<WifiCredentials> readWifiSettings(String deviceId) async {
+    return WifiCredentials.empty();
+  }
+
+  @override
+  Future<SaveWifiSettingsResponse> saveWifiSettings({
+    required String deviceId,
+    required WifiCredentials credentials,
+  }) async {
+    return const SaveWifiSettingsResponse(restartScheduled: true);
   }
 
   @override

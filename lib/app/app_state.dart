@@ -122,4 +122,12 @@ class AppController extends ChangeNotifier {
     );
     notifyListeners();
   }
+
+  void setConnectionState(WateringHubConnectionState connectionState) {
+    _state = _state.copyWith(
+      connectionState: connectionState,
+      clearLastError: true,
+    );
+    notifyListeners();
+  }
 }

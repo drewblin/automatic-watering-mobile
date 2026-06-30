@@ -8,7 +8,9 @@ import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
+import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
+import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub_state.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 void main() {
@@ -38,7 +40,7 @@ void main() {
       AutomaticWateringBleConstants.pairingPasskey,
     );
 
-    expect(controller.state.step, BleOnboardingStep.paired);
+    expect(controller.state.step, BleOnboardingStep.wifiProvisioning);
     expect(controller.state.connectionStatus, BleConnectionStatus.connected);
     expect(storage.activeHub?.bleDeviceId, 'AA:BB:CC');
     expect(storage.activeHub?.displayName,
@@ -120,10 +122,119 @@ void main() {
     expect(storage.activeHub?.serverDeviceId, isNull);
     expect(storage.activeHub?.createdAt, isNot(createdAt));
   });
+
+  test('reading Wi-Fi settings keeps controller password out of state',
+      () async {
+    final appController = AppController(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+    );
+    await appController.initialize();
+    final bleService = FakeBleService(
+      currentWifi: const WifiCredentials(
+        ssid: 'Greenhouse',
+        password: 'firmware-secret',
+      ),
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      appController: appController,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.pairSelectedDevice(
+      AutomaticWateringBleConstants.pairingPasskey,
+    );
+
+    expect(controller.state.wifiCredentials.ssid, 'Greenhouse');
+    expect(controller.state.wifiCredentials.password, isEmpty);
+    expect(controller.state.wifiStatus, WifiProvisioningStatus.ready);
+  });
+
+  test('Wi-Fi validation blocks invalid credentials without saving', () async {
+    final appController = AppController(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+    );
+    await appController.initialize();
+    final bleService = FakeBleService();
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      appController: appController,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.pairSelectedDevice(
+      AutomaticWateringBleConstants.pairingPasskey,
+    );
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'short'),
+    );
+
+    expect(controller.state.wifiValidationErrors['password'], isNotNull);
+    expect(bleService.savedWifiCredentials, isNull);
+    expect(controller.state.wifiCredentials.password, isEmpty);
+  });
+
+  test('saving Wi-Fi settings schedules BLE reconnect and advances flow',
+      () async {
+    final storage = InMemoryWateringHubStorage();
+    final appController = AppController(
+      wateringHubStorage: storage,
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+    );
+    await appController.initialize();
+    final bleService = FakeBleService();
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      appController: appController,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.pairSelectedDevice(
+      AutomaticWateringBleConstants.pairingPasskey,
+    );
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+
+    expect(bleService.savedWifiCredentials?.ssid, 'Garden');
+    expect(bleService.savedWifiCredentials?.password, 'secure123');
+    expect(bleService.disconnectCalls, 1);
+    expect(bleService.reconnectCalls, 1);
+    expect(controller.state.step, BleOnboardingStep.accessBootstrap);
+    expect(controller.state.wifiStatus, WifiProvisioningStatus.completed);
+    expect(controller.state.wifiCredentials.password, isEmpty);
+    expect(
+      appController.state.connectionState,
+      WateringHubConnectionState.reconnectingBle,
+    );
+  });
 }
 
+const testDevice = BleDiscoveredDevice(
+  id: 'AA:BB:CC',
+  name: AutomaticWateringBleConstants.deviceName,
+  rssi: -54,
+  isLikelyAutomaticWateringHub: true,
+  advertisedServiceUuids: {AutomaticWateringBleConstants.serviceUuid},
+);
+
 class FakeBleService implements BleService {
+  FakeBleService({
+    this.currentWifi = const WifiCredentials(ssid: '', password: ''),
+  });
+
   final _statusController = StreamController<BleConnectionStatus>.broadcast();
+  final WifiCredentials currentWifi;
+  WifiCredentials? savedWifiCredentials;
+  int disconnectCalls = 0;
+  int reconnectCalls = 0;
 
   @override
   Stream<List<BleDiscoveredDevice>> get discoveredDevices =>
@@ -150,6 +261,12 @@ class FakeBleService implements BleService {
   }
 
   @override
+  Future<void> reconnect(BleDiscoveredDevice device) async {
+    reconnectCalls += 1;
+    _statusController.add(BleConnectionStatus.pairingRequired);
+  }
+
+  @override
   Future<BleDeviceServices> pairAndDiscoverServices({
     required BleDiscoveredDevice device,
     required String passkey,
@@ -164,7 +281,23 @@ class FakeBleService implements BleService {
   }
 
   @override
-  Future<void> disconnect(String deviceId) async {}
+  Future<void> disconnect(String deviceId) async {
+    disconnectCalls += 1;
+  }
+
+  @override
+  Future<WifiCredentials> readWifiSettings(String deviceId) async {
+    return currentWifi.copyWith(password: '');
+  }
+
+  @override
+  Future<SaveWifiSettingsResponse> saveWifiSettings({
+    required String deviceId,
+    required WifiCredentials credentials,
+  }) async {
+    savedWifiCredentials = credentials;
+    return const SaveWifiSettingsResponse(restartScheduled: true);
+  }
 
   @override
   Future<BleDeviceServices> discoverServices(String deviceId) async {

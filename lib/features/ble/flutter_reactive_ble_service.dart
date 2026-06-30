@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -6,6 +7,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'ble_constants.dart';
 import 'ble_models.dart';
 import 'ble_service.dart';
+import '../onboarding/wifi_provisioning_models.dart';
+import '../../core/api_envelope.dart';
 
 class FlutterReactiveBleService implements BleService {
   FlutterReactiveBleService({FlutterReactiveBle? reactiveBle})
@@ -148,6 +151,12 @@ class FlutterReactiveBleService implements BleService {
   }
 
   @override
+  Future<void> reconnect(BleDiscoveredDevice device) async {
+    _statusController.add(BleConnectionStatus.reconnecting);
+    await connect(device);
+  }
+
+  @override
   Future<BleDeviceServices> pairAndDiscoverServices({
     required BleDiscoveredDevice device,
     required String passkey,
@@ -204,6 +213,50 @@ class FlutterReactiveBleService implements BleService {
   }
 
   @override
+  Future<WifiCredentials> readWifiSettings(String deviceId) async {
+    _ensureConnected(deviceId);
+    final value = await _ble.readCharacteristic(
+      _qualifiedCharacteristic(
+        deviceId,
+        AutomaticWateringBleConstants.wifiSettings.uuid,
+      ),
+    );
+    final envelope = _decodeEnvelope<WifiCredentials>(
+      value,
+      WifiCredentials.fromControllerSettings,
+    );
+    if (!envelope.success) {
+      throw StateError(envelope.error ?? 'Wi-Fi settings read failed');
+    }
+    return envelope.data;
+  }
+
+  @override
+  Future<SaveWifiSettingsResponse> saveWifiSettings({
+    required String deviceId,
+    required WifiCredentials credentials,
+  }) async {
+    _ensureConnected(deviceId);
+    final characteristic = _qualifiedCharacteristic(
+      deviceId,
+      AutomaticWateringBleConstants.saveWifiSettings.uuid,
+    );
+    await _ble.writeCharacteristicWithResponse(
+      characteristic,
+      value: utf8.encode(jsonEncode(credentials.toBleJson())),
+    );
+    final responseValue = await _ble.readCharacteristic(characteristic);
+    final envelope = _decodeEnvelope<SaveWifiSettingsResponse>(
+      responseValue,
+      SaveWifiSettingsResponse.fromJson,
+    );
+    if (!envelope.success) {
+      throw StateError(envelope.error ?? 'Wi-Fi settings save failed');
+    }
+    return envelope.data;
+  }
+
+  @override
   Future<void> dispose() async {
     await stopScan();
     await _connectionSubscription?.cancel();
@@ -251,5 +304,33 @@ class FlutterReactiveBleService implements BleService {
       isLikelyAutomaticWateringHub: hasExpectedName || advertisesService,
       advertisedServiceUuids: advertisedServiceUuids,
     );
+  }
+
+  QualifiedCharacteristic _qualifiedCharacteristic(
+    String deviceId,
+    String characteristicUuid,
+  ) {
+    return QualifiedCharacteristic(
+      characteristicId: Uuid.parse(characteristicUuid),
+      serviceId: Uuid.parse(AutomaticWateringBleConstants.serviceUuid),
+      deviceId: deviceId,
+    );
+  }
+
+  void _ensureConnected(String deviceId) {
+    if (_connectedDeviceId != deviceId) {
+      throw StateError('BLE device is not connected');
+    }
+  }
+
+  ApiEnvelope<T> _decodeEnvelope<T>(
+    List<int> value,
+    T Function(Object? data) parseData,
+  ) {
+    final decoded = jsonDecode(utf8.decode(value));
+    if (decoded is! Map<String, Object?>) {
+      throw const FormatException('BLE response envelope must be an object');
+    }
+    return ApiEnvelope<T>.fromJson(decoded, parseData);
   }
 }

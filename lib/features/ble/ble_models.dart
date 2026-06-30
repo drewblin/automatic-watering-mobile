@@ -13,6 +13,7 @@ enum BleConnectionStatus {
   scanning,
   deviceFound,
   connecting,
+  reconnecting,
   pairingRequired,
   pairing,
   connected,
