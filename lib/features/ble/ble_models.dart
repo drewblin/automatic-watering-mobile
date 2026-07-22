@@ -8,21 +8,6 @@ enum BleAvailability {
   bluetoothDisabled,
 }
 
-enum BleConnectionStatus {
-  idle,
-  scanning,
-  deviceFound,
-  connecting,
-  reconnecting,
-  pairingRequired,
-  pairing,
-  connected,
-  disconnected,
-  permissionRequired,
-  bluetoothDisabled,
-  error,
-}
-
 @immutable
 class BleDiscoveredDevice {
   const BleDiscoveredDevice({

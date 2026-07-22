@@ -40,8 +40,7 @@ void main() {
       AutomaticWateringBleConstants.pairingPasskey,
     );
 
-    expect(controller.state.step, BleOnboardingStep.wifiProvisioning);
-    expect(controller.state.connectionStatus, BleConnectionStatus.connected);
+    expect(controller.state, isA<WifiCredentialsFormReady>());
     expect(storage.activeHub?.bleDeviceId, 'AA:BB:CC');
     expect(storage.activeHub?.displayName,
         AutomaticWateringBleConstants.deviceName);
@@ -70,9 +69,9 @@ void main() {
     );
     await controller.pairSelectedDevice('000000');
 
-    expect(controller.state.connectionStatus, BleConnectionStatus.error);
+    expect(controller.state, isA<AwaitingPairingPasskey>());
     expect(
-      controller.state.lastError?.message,
+      controller.state.bleError?.message,
       'Неправильний код сполучення.',
     );
     expect(storage.activeHub, isNull);
@@ -149,7 +148,7 @@ void main() {
 
     expect(controller.state.wifiCredentials.ssid, 'Greenhouse');
     expect(controller.state.wifiCredentials.password, isEmpty);
-    expect(controller.state.wifiStatus, WifiProvisioningStatus.ready);
+    expect(controller.state, isA<WifiCredentialsFormReady>());
   });
 
   test('Wi-Fi validation blocks invalid credentials without saving', () async {
@@ -207,8 +206,7 @@ void main() {
     expect(bleService.savedWifiCredentials?.password, 'secure123');
     expect(bleService.disconnectCalls, 1);
     expect(bleService.reconnectCalls, 1);
-    expect(controller.state.step, BleOnboardingStep.accessBootstrap);
-    expect(controller.state.wifiStatus, WifiProvisioningStatus.completed);
+    expect(controller.state, isA<AccessSetupReady>());
     expect(controller.state.wifiCredentials.password, isEmpty);
     expect(
       appController.state.connectionState,
@@ -230,7 +228,6 @@ class FakeBleService implements BleService {
     this.currentWifi = const WifiCredentials(ssid: '', password: ''),
   });
 
-  final _statusController = StreamController<BleConnectionStatus>.broadcast();
   final WifiCredentials currentWifi;
   WifiCredentials? savedWifiCredentials;
   int disconnectCalls = 0;
@@ -239,9 +236,6 @@ class FakeBleService implements BleService {
   @override
   Stream<List<BleDiscoveredDevice>> get discoveredDevices =>
       const Stream.empty();
-
-  @override
-  Stream<BleConnectionStatus> get connectionStatus => _statusController.stream;
 
   @override
   Future<BleAvailability> checkAvailability() async => BleAvailability.ready;
@@ -256,14 +250,11 @@ class FakeBleService implements BleService {
   Future<void> stopScan() async {}
 
   @override
-  Future<void> connect(BleDiscoveredDevice device) async {
-    _statusController.add(BleConnectionStatus.pairingRequired);
-  }
+  Future<void> connect(BleDiscoveredDevice device) async {}
 
   @override
   Future<void> reconnect(BleDiscoveredDevice device) async {
     reconnectCalls += 1;
-    _statusController.add(BleConnectionStatus.pairingRequired);
   }
 
   @override
@@ -271,7 +262,6 @@ class FakeBleService implements BleService {
     required BleDiscoveredDevice device,
     required String passkey,
   }) async {
-    _statusController.add(BleConnectionStatus.connected);
     return BleDeviceServices(
       deviceId: device.id,
       hasAutomaticWateringService: true,
@@ -310,7 +300,5 @@ class FakeBleService implements BleService {
   }
 
   @override
-  Future<void> dispose() async {
-    await _statusController.close();
-  }
+  Future<void> dispose() async {}
 }

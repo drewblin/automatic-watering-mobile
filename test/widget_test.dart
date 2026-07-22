@@ -40,9 +40,6 @@ class FakeBleService implements BleService {
       const Stream.empty();
 
   @override
-  Stream<BleConnectionStatus> get connectionStatus => const Stream.empty();
-
-  @override
   Future<BleAvailability> checkAvailability() async => BleAvailability.ready;
 
   @override

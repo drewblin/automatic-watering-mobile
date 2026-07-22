@@ -55,6 +55,14 @@ class WifiCredentials {
     );
   }
 
+  WifiCredentials get sanitizedForState {
+    return WifiCredentials(
+      ssid: ssid.trim(),
+      password: '',
+      openNetwork: openNetwork,
+    );
+  }
+
   Map<String, String> validate() {
     final errors = <String, String>{};
     final normalizedSsid = ssid.trim();

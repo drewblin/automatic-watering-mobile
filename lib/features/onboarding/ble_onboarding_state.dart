@@ -3,105 +3,248 @@ import 'package:flutter/foundation.dart';
 import '../ble/ble_models.dart';
 import 'wifi_provisioning_models.dart';
 
-enum BleOnboardingStep {
-  discovery,
-  pairing,
-  paired,
-  wifiProvisioning,
-  accessBootstrap,
-}
-
-enum WifiProvisioningStatus {
-  idle,
-  reading,
-  ready,
-  saving,
-  rebooting,
-  reconnecting,
-  completed,
-}
-
 @immutable
-class BleOnboardingState {
-  const BleOnboardingState({
-    required this.step,
-    required this.devices,
-    required this.selectedDevice,
-    required this.connectionStatus,
-    required this.lastError,
-    required this.wifiCredentials,
-    required this.wifiValidationErrors,
-    required this.wifiStatus,
-    required this.wifiError,
+sealed class BleOnboardingState {
+  const BleOnboardingState();
+
+  List<BleDiscoveredDevice> get devices => const [];
+
+  BleDiscoveredDevice? get selectedDevice => null;
+
+  BleConnectionError? get bleError => null;
+
+  WifiProvisioningError? get wifiError => null;
+
+  WifiCredentials get wifiCredentials => WifiCredentials.empty();
+
+  Map<String, String> get wifiValidationErrors => const {};
+
+  bool get canSaveWifi => false;
+}
+
+final class CheckingBluetooth extends BleOnboardingState {
+  const CheckingBluetooth();
+}
+
+final class BluetoothUnavailable extends BleOnboardingState {
+  const BluetoothUnavailable({required this.availability});
+
+  final BleAvailability availability;
+}
+
+final class ReadyToScan extends BleOnboardingState {
+  const ReadyToScan({this.error});
+
+  final BleConnectionError? error;
+
+  @override
+  BleConnectionError? get bleError => error;
+}
+
+final class DiscoveringDevices extends BleOnboardingState {
+  const DiscoveringDevices({required this.foundDevices});
+
+  final List<BleDiscoveredDevice> foundDevices;
+
+  @override
+  List<BleDiscoveredDevice> get devices => foundDevices;
+}
+
+final class DeviceSelected extends BleOnboardingState {
+  const DeviceSelected({
+    required this.foundDevices,
+    required this.device,
+    this.error,
   });
 
-  factory BleOnboardingState.initial() {
-    return const BleOnboardingState(
-      step: BleOnboardingStep.discovery,
-      devices: [],
-      selectedDevice: null,
-      connectionStatus: BleConnectionStatus.idle,
-      lastError: null,
-      wifiCredentials: WifiCredentials(ssid: '', password: ''),
-      wifiValidationErrors: {},
-      wifiStatus: WifiProvisioningStatus.idle,
-      wifiError: null,
-    );
-  }
+  final List<BleDiscoveredDevice> foundDevices;
+  final BleDiscoveredDevice device;
+  final BleConnectionError? error;
 
-  final BleOnboardingStep step;
-  final List<BleDiscoveredDevice> devices;
-  final BleDiscoveredDevice? selectedDevice;
-  final BleConnectionStatus connectionStatus;
-  final BleConnectionError? lastError;
-  final WifiCredentials wifiCredentials;
-  final Map<String, String> wifiValidationErrors;
-  final WifiProvisioningStatus wifiStatus;
-  final WifiProvisioningError? wifiError;
+  @override
+  List<BleDiscoveredDevice> get devices => foundDevices;
 
-  bool get canContinue {
-    return step == BleOnboardingStep.paired &&
-        selectedDevice != null &&
-        connectionStatus == BleConnectionStatus.connected;
-  }
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
 
-  bool get canSaveWifi {
-    return step == BleOnboardingStep.wifiProvisioning &&
-        connectionStatus == BleConnectionStatus.connected &&
-        wifiStatus != WifiProvisioningStatus.reading &&
-        wifiStatus != WifiProvisioningStatus.saving &&
-        wifiStatus != WifiProvisioningStatus.rebooting &&
-        wifiStatus != WifiProvisioningStatus.reconnecting;
-  }
+  @override
+  BleConnectionError? get bleError => error;
+}
 
-  BleOnboardingState copyWith({
-    BleOnboardingStep? step,
-    List<BleDiscoveredDevice>? devices,
-    BleDiscoveredDevice? selectedDevice,
-    BleConnectionStatus? connectionStatus,
-    BleConnectionError? lastError,
-    WifiCredentials? wifiCredentials,
-    Map<String, String>? wifiValidationErrors,
-    WifiProvisioningStatus? wifiStatus,
-    WifiProvisioningError? wifiError,
-    bool clearSelectedDevice = false,
-    bool clearLastError = false,
-    bool clearWifiValidationErrors = false,
-    bool clearWifiError = false,
-  }) {
-    return BleOnboardingState(
-      step: step ?? this.step,
-      devices: devices ?? this.devices,
-      selectedDevice:
-          clearSelectedDevice ? null : selectedDevice ?? this.selectedDevice,
-      connectionStatus: connectionStatus ?? this.connectionStatus,
-      lastError: clearLastError ? null : lastError ?? this.lastError,
-      wifiCredentials: wifiCredentials ?? this.wifiCredentials,
-      wifiValidationErrors: clearWifiValidationErrors
-          ? const {}
-          : wifiValidationErrors ?? this.wifiValidationErrors,
-      wifiStatus: wifiStatus ?? this.wifiStatus,
-      wifiError: clearWifiError ? null : wifiError ?? this.wifiError,
-    );
-  }
+final class ConnectingDevice extends BleOnboardingState {
+  const ConnectingDevice({
+    required this.foundDevices,
+    required this.device,
+  });
+
+  final List<BleDiscoveredDevice> foundDevices;
+  final BleDiscoveredDevice device;
+
+  @override
+  List<BleDiscoveredDevice> get devices => foundDevices;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+}
+
+final class AwaitingPairingPasskey extends BleOnboardingState {
+  const AwaitingPairingPasskey({
+    required this.foundDevices,
+    required this.device,
+    this.error,
+  });
+
+  final List<BleDiscoveredDevice> foundDevices;
+  final BleDiscoveredDevice device;
+  final BleConnectionError? error;
+
+  @override
+  List<BleDiscoveredDevice> get devices => foundDevices;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  BleConnectionError? get bleError => error;
+}
+
+final class PairingInProgress extends BleOnboardingState {
+  const PairingInProgress({
+    required this.foundDevices,
+    required this.device,
+  });
+
+  final List<BleDiscoveredDevice> foundDevices;
+  final BleDiscoveredDevice device;
+
+  @override
+  List<BleDiscoveredDevice> get devices => foundDevices;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+}
+
+final class ReadingWifiSettings extends BleOnboardingState {
+  const ReadingWifiSettings({required this.device});
+
+  final BleDiscoveredDevice device;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+}
+
+final class WifiCredentialsFormReady extends BleOnboardingState {
+  WifiCredentialsFormReady({
+    required this.device,
+    required this.credentials,
+    this.validationErrors = const {},
+    this.error,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final Map<String, String> validationErrors;
+  final WifiProvisioningError? error;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  Map<String, String> get wifiValidationErrors => validationErrors;
+
+  @override
+  WifiProvisioningError? get wifiError => error;
+
+  @override
+  bool get canSaveWifi => true;
+}
+
+final class SavingWifiSettings extends BleOnboardingState {
+  SavingWifiSettings({
+    required this.device,
+    required this.credentials,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+}
+
+final class WaitingForControllerReboot extends BleOnboardingState {
+  WaitingForControllerReboot({
+    required this.device,
+    required this.credentials,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+}
+
+final class ReconnectingAfterReboot extends BleOnboardingState {
+  ReconnectingAfterReboot({
+    required this.device,
+    required this.credentials,
+    required this.attempt,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final int attempt;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+}
+
+final class ReconnectAfterRebootBlocked extends BleOnboardingState {
+  ReconnectAfterRebootBlocked({
+    required this.device,
+    required this.credentials,
+    required this.error,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final WifiProvisioningError error;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  WifiProvisioningError? get wifiError => error;
+}
+
+final class AccessSetupReady extends BleOnboardingState {
+  AccessSetupReady({
+    required this.device,
+    required this.credentials,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
 }

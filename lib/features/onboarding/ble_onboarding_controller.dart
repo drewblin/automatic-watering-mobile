@@ -23,20 +23,30 @@ class BleOnboardingController extends ChangeNotifier {
         _rebootDelay = rebootDelay,
         _reconnectRetryDelay = reconnectRetryDelay,
         _maxReconnectAttempts = maxReconnectAttempts {
-    _devicesSubscription = _bleService.discoveredDevices.listen((devices) {
-      _state = _state.copyWith(
-        devices: devices,
-        connectionStatus: devices.isEmpty
-            ? _state.connectionStatus
-            : BleConnectionStatus.deviceFound,
-        clearLastError: true,
-      );
-      notifyListeners();
-    });
-    _statusSubscription = _bleService.connectionStatus.listen((status) {
-      _state = _state.copyWith(connectionStatus: status);
-      notifyListeners();
-    });
+    _devicesSubscription = _bleService.discoveredDevices.listen(
+      (devices) {
+        _devices = List.unmodifiable(devices);
+        final state = _state;
+        if (state is DiscoveringDevices) {
+          _setState(DiscoveringDevices(foundDevices: _devices));
+        } else if (state is DeviceSelected) {
+          _setState(
+            DeviceSelected(
+              foundDevices: _devices,
+              device: state.device,
+              error: state.error,
+            ),
+          );
+        }
+      },
+      onError: (Object error) {
+        _setState(
+          ReadyToScan(
+            error: _bleError('Не вдалося виконати BLE-пошук.', error),
+          ),
+        );
+      },
+    );
   }
 
   final BleService _bleService;
@@ -45,62 +55,67 @@ class BleOnboardingController extends ChangeNotifier {
   final Duration _reconnectRetryDelay;
   final int _maxReconnectAttempts;
   StreamSubscription<List<BleDiscoveredDevice>>? _devicesSubscription;
-  StreamSubscription<BleConnectionStatus>? _statusSubscription;
+  List<BleDiscoveredDevice> _devices = const [];
+  bool _isBleConnected = false;
+  bool _isDisposed = false;
+  int _availabilityRequestId = 0;
 
-  BleOnboardingState _state = BleOnboardingState.initial();
+  BleOnboardingState _state = const CheckingBluetooth();
 
   BleOnboardingState get state => _state;
 
   Future<void> checkAvailability() async {
+    final requestId = ++_availabilityRequestId;
+    _setState(const CheckingBluetooth());
     final availability = await _bleService.checkAvailability();
-    _state = _state.copyWith(
-      connectionStatus: _statusFromAvailability(availability),
-      clearLastError: true,
-    );
-    notifyListeners();
+    if (requestId != _availabilityRequestId) {
+      return;
+    }
+    _setAvailabilityState(availability);
   }
 
   Future<void> requestPermissions() async {
+    final requestId = ++_availabilityRequestId;
+    _setState(const CheckingBluetooth());
     final availability = await _bleService.requestPermissions();
-    _state = _state.copyWith(
-      connectionStatus: _statusFromAvailability(availability),
-      clearLastError: true,
-    );
-    notifyListeners();
+    if (requestId != _availabilityRequestId) {
+      return;
+    }
+    _setAvailabilityState(availability);
   }
 
   Future<void> startScan() async {
-    _state = _state.copyWith(
-      step: BleOnboardingStep.discovery,
-      devices: const [],
-      connectionStatus: BleConnectionStatus.scanning,
-      clearSelectedDevice: true,
-      clearLastError: true,
-    );
-    notifyListeners();
+    _availabilityRequestId += 1;
+    final availability = await _bleService.checkAvailability();
+    if (availability != BleAvailability.ready) {
+      _setState(BluetoothUnavailable(availability: availability));
+      return;
+    }
+
+    _devices = const [];
+    _isBleConnected = false;
+    _setState(const DiscoveringDevices(foundDevices: []));
 
     try {
       await _bleService.startScan();
     } catch (error) {
-      _setError('Не вдалося запустити BLE-пошук.', error);
+      _setState(
+        ReadyToScan(
+          error: _bleError('Не вдалося запустити BLE-пошук.', error),
+        ),
+      );
     }
   }
 
   Future<void> stopScan() async {
     await _bleService.stopScan();
-    if (_state.connectionStatus == BleConnectionStatus.scanning) {
-      _state = _state.copyWith(connectionStatus: BleConnectionStatus.idle);
-      notifyListeners();
+    if (_state is DiscoveringDevices) {
+      _setState(const ReadyToScan());
     }
   }
 
   void selectDevice(BleDiscoveredDevice device) {
-    _state = _state.copyWith(
-      selectedDevice: device,
-      connectionStatus: BleConnectionStatus.deviceFound,
-      clearLastError: true,
-    );
-    notifyListeners();
+    _setState(DeviceSelected(foundDevices: _devices, device: device));
   }
 
   Future<void> connectSelectedDevice() async {
@@ -109,17 +124,21 @@ class BleOnboardingController extends ChangeNotifier {
       return;
     }
 
-    _state = _state.copyWith(
-      step: BleOnboardingStep.pairing,
-      connectionStatus: BleConnectionStatus.connecting,
-      clearLastError: true,
-    );
-    notifyListeners();
+    _setState(ConnectingDevice(foundDevices: _devices, device: device));
 
     try {
       await _bleService.connect(device);
+      _isBleConnected = true;
+      _setState(AwaitingPairingPasskey(foundDevices: _devices, device: device));
     } catch (error) {
-      _setError('Не вдалося підключитися до контролера.', error);
+      _isBleConnected = false;
+      _setState(
+        DeviceSelected(
+          foundDevices: _devices,
+          device: device,
+          error: _bleError('Не вдалося підключитися до контролера.', error),
+        ),
+      );
     }
   }
 
@@ -130,19 +149,20 @@ class BleOnboardingController extends ChangeNotifier {
     }
 
     if (passkey != AutomaticWateringBleConstants.pairingPasskey) {
-      _setError(
-        'Неправильний код сполучення.',
-        ArgumentError('Invalid BLE pairing passkey'),
+      _setState(
+        AwaitingPairingPasskey(
+          foundDevices: _devices,
+          device: device,
+          error: _bleError(
+            'Неправильний код сполучення.',
+            ArgumentError('Invalid BLE pairing passkey'),
+          ),
+        ),
       );
       return;
     }
 
-    _state = _state.copyWith(
-      step: BleOnboardingStep.pairing,
-      connectionStatus: BleConnectionStatus.pairing,
-      clearLastError: true,
-    );
-    notifyListeners();
+    _setState(PairingInProgress(foundDevices: _devices, device: device));
 
     try {
       final services = await _bleService.pairAndDiscoverServices(
@@ -152,107 +172,123 @@ class BleOnboardingController extends ChangeNotifier {
       if (!services.hasAutomaticWateringService) {
         throw StateError('Automatic Watering BLE service was not discovered');
       }
+      _isBleConnected = true;
       await _savePairedHub(device);
-      _state = _state.copyWith(
-        step: BleOnboardingStep.wifiProvisioning,
-        connectionStatus: BleConnectionStatus.connected,
-        clearLastError: true,
-      );
-      notifyListeners();
-      await readCurrentWifiSettings();
+      await readCurrentWifiSettings(deviceOverride: device);
     } catch (error) {
-      _setError('Сполучення не виконано.', error);
+      _setState(
+        AwaitingPairingPasskey(
+          foundDevices: _devices,
+          device: device,
+          error: _bleError('Сполучення не виконано.', error),
+        ),
+      );
     }
   }
 
   void updateWifiCredentials(WifiCredentials credentials) {
-    _state = _state.copyWith(
-      wifiCredentials: credentials,
-      clearWifiValidationErrors: true,
-      clearWifiError: true,
+    final state = _state;
+    if (state is! WifiCredentialsFormReady) {
+      return;
+    }
+    _setState(
+      WifiCredentialsFormReady(
+        device: state.device,
+        credentials: credentials.sanitizedForState,
+      ),
     );
-    notifyListeners();
   }
 
   Future<void> useCurrentPhoneWifi() async {
-    _setWifiError(
-      message:
-          'Автопідстановка поточної Wi-Fi мережі недоступна на цій платформі.',
-      operation: WifiProvisioningOperation.phoneWifiAutofill,
-      error: UnsupportedError('Phone Wi-Fi platform API is not configured'),
+    final state = _state;
+    if (state is! WifiCredentialsFormReady) {
+      return;
+    }
+    _setState(
+      WifiCredentialsFormReady(
+        device: state.device,
+        credentials: state.credentials.sanitizedForState,
+        error: _wifiError(
+          message:
+              'Автопідстановка поточної Wi-Fi мережі недоступна на цій платформі.',
+          operation: WifiProvisioningOperation.phoneWifiAutofill,
+          error: UnsupportedError('Phone Wi-Fi platform API is not configured'),
+        ),
+      ),
     );
   }
 
-  Future<void> readCurrentWifiSettings() async {
-    final device = _state.selectedDevice;
+  Future<void> readCurrentWifiSettings({
+    BleDiscoveredDevice? deviceOverride,
+  }) async {
+    final device = deviceOverride ?? _state.selectedDevice;
     if (device == null) {
       return;
     }
-    if (_state.connectionStatus != BleConnectionStatus.connected) {
-      _state = _state.copyWith(
-        connectionStatus: BleConnectionStatus.reconnecting,
-        wifiStatus: WifiProvisioningStatus.reconnecting,
-      );
-      notifyListeners();
-      return;
-    }
 
-    _state = _state.copyWith(
-      step: BleOnboardingStep.wifiProvisioning,
-      wifiStatus: WifiProvisioningStatus.reading,
-      clearWifiError: true,
-      clearWifiValidationErrors: true,
-    );
-    notifyListeners();
+    final previousCredentials = _state.wifiCredentials.sanitizedForState;
+    _setState(ReadingWifiSettings(device: device));
 
     try {
+      if (!_isBleConnected) {
+        await _bleService.reconnect(device);
+        _isBleConnected = true;
+      }
       final credentials = await _bleService.readWifiSettings(device.id);
-      _state = _state.copyWith(
-        wifiCredentials: credentials.copyWith(password: ''),
-        wifiStatus: WifiProvisioningStatus.ready,
-        clearWifiError: true,
+      _setState(
+        WifiCredentialsFormReady(
+          device: device,
+          credentials: credentials.sanitizedForState,
+        ),
       );
-      notifyListeners();
     } catch (error) {
-      _setWifiError(
-        message: 'Не вдалося прочитати поточну Wi-Fi мережу контролера.',
-        operation: WifiProvisioningOperation.readCurrentSettings,
-        error: error,
-        status: WifiProvisioningStatus.ready,
+      _isBleConnected = false;
+      _setState(
+        WifiCredentialsFormReady(
+          device: device,
+          credentials: previousCredentials,
+          error: _wifiError(
+            message: 'Не вдалося прочитати поточну Wi-Fi мережу контролера.',
+            operation: WifiProvisioningOperation.readCurrentSettings,
+            error: error,
+          ),
+        ),
       );
     }
   }
 
   Future<void> saveWifiSettings(WifiCredentials credentials) async {
-    final device = _state.selectedDevice;
-    if (device == null) {
+    final state = _state;
+    if (state is! WifiCredentialsFormReady) {
       return;
     }
 
+    final device = state.device;
     final normalized = credentials.normalizedForSave;
+    final publicCredentials = normalized.sanitizedForState;
     final validationErrors = normalized.validate();
     if (validationErrors.isNotEmpty) {
-      _state = _state.copyWith(
-        wifiCredentials: normalized.copyWith(password: ''),
-        wifiValidationErrors: validationErrors,
-        wifiStatus: WifiProvisioningStatus.ready,
-        wifiError: const WifiProvisioningError(
-          message: 'Перевірте поля Wi-Fi.',
-          technicalReason: 'Validation failed',
-          operation: WifiProvisioningOperation.validateInput,
+      _setState(
+        WifiCredentialsFormReady(
+          device: device,
+          credentials: publicCredentials,
+          validationErrors: validationErrors,
+          error: const WifiProvisioningError(
+            message: 'Перевірте поля Wi-Fi.',
+            technicalReason: 'Validation failed',
+            operation: WifiProvisioningOperation.validateInput,
+          ),
         ),
       );
-      notifyListeners();
       return;
     }
 
-    _state = _state.copyWith(
-      wifiCredentials: normalized,
-      wifiStatus: WifiProvisioningStatus.saving,
-      clearWifiError: true,
-      clearWifiValidationErrors: true,
+    _setState(
+      SavingWifiSettings(
+        device: device,
+        credentials: publicCredentials,
+      ),
     );
-    notifyListeners();
 
     try {
       final response = await _bleService.saveWifiSettings(
@@ -262,35 +298,42 @@ class BleOnboardingController extends ChangeNotifier {
       if (!response.restartScheduled) {
         throw StateError('Controller did not schedule restart');
       }
-      _state = _state.copyWith(
-        wifiCredentials: normalized.copyWith(password: ''),
-        wifiStatus: WifiProvisioningStatus.rebooting,
+
+      _setState(
+        WaitingForControllerReboot(
+          device: device,
+          credentials: publicCredentials,
+        ),
       );
       _appController.setConnectionState(
         WateringHubConnectionState.reconnectingBle,
       );
-      notifyListeners();
 
       await Future<void>.delayed(_rebootDelay);
       await _bleService.disconnect(device.id);
-      await _reconnectAfterReboot(device);
+      _isBleConnected = false;
+      await _reconnectAfterReboot(device, publicCredentials);
     } catch (error) {
-      _setWifiError(
-        message: 'Контролер не прийняв Wi-Fi налаштування.',
-        operation: WifiProvisioningOperation.saveSettings,
-        error: error,
-        status: WifiProvisioningStatus.ready,
-        credentials: normalized.copyWith(password: ''),
+      _setState(
+        WifiCredentialsFormReady(
+          device: device,
+          credentials: publicCredentials,
+          error: _wifiError(
+            message: 'Контролер не прийняв Wi-Fi налаштування.',
+            operation: WifiProvisioningOperation.saveSettings,
+            error: error,
+          ),
+        ),
       );
     }
   }
 
   Future<void> retryWifiReconnect() async {
-    final device = _state.selectedDevice;
-    if (device == null) {
+    final state = _state;
+    if (state is! ReconnectAfterRebootBlocked) {
       return;
     }
-    await _reconnectAfterReboot(device);
+    await _reconnectAfterReboot(state.device, state.credentials);
   }
 
   Future<void> disconnect() async {
@@ -299,6 +342,56 @@ class BleOnboardingController extends ChangeNotifier {
       return;
     }
     await _bleService.disconnect(deviceId);
+    _isBleConnected = false;
+  }
+
+  Future<void> _reconnectAfterReboot(
+    BleDiscoveredDevice device,
+    WifiCredentials credentials,
+  ) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= _maxReconnectAttempts; attempt += 1) {
+      _setState(
+        ReconnectingAfterReboot(
+          device: device,
+          credentials: credentials,
+          attempt: attempt,
+        ),
+      );
+      try {
+        await _bleService.reconnect(device);
+        await _bleService.pairAndDiscoverServices(
+          device: device,
+          passkey: AutomaticWateringBleConstants.pairingPasskey,
+        );
+        _isBleConnected = true;
+        _setState(
+          AccessSetupReady(
+            device: device,
+            credentials: credentials.sanitizedForState,
+          ),
+        );
+        return;
+      } catch (error) {
+        lastError = error;
+        _isBleConnected = false;
+        if (attempt < _maxReconnectAttempts) {
+          await Future<void>.delayed(_reconnectRetryDelay);
+        }
+      }
+    }
+
+    _setState(
+      ReconnectAfterRebootBlocked(
+        device: device,
+        credentials: credentials.sanitizedForState,
+        error: _wifiError(
+          message: 'Не вдалося повторно підключитися до контролера через BLE.',
+          operation: WifiProvisioningOperation.reconnectBle,
+          error: lastError ?? StateError('BLE reconnect failed'),
+        ),
+      ),
+    );
   }
 
   Future<void> _savePairedHub(BleDiscoveredDevice device) async {
@@ -322,78 +415,39 @@ class BleOnboardingController extends ChangeNotifier {
     await _appController.saveActiveWateringHub(hub);
   }
 
-  void _setError(String message, Object error) {
-    _state = _state.copyWith(
-      connectionStatus: BleConnectionStatus.error,
-      lastError: BleConnectionError(
-        message: message,
-        technicalReason: _safeTechnicalReason(error),
-      ),
-    );
-    notifyListeners();
-  }
-
-  Future<void> _reconnectAfterReboot(BleDiscoveredDevice device) async {
-    _state = _state.copyWith(
-      connectionStatus: BleConnectionStatus.reconnecting,
-      wifiStatus: WifiProvisioningStatus.reconnecting,
-      clearWifiError: true,
-    );
-    notifyListeners();
-
-    Object? lastError;
-    for (var attempt = 0; attempt < _maxReconnectAttempts; attempt += 1) {
-      try {
-        await _bleService.reconnect(device);
-        await _bleService.pairAndDiscoverServices(
-          device: device,
-          passkey: AutomaticWateringBleConstants.pairingPasskey,
-        );
-        _state = _state.copyWith(
-          step: BleOnboardingStep.accessBootstrap,
-          connectionStatus: BleConnectionStatus.connected,
-          wifiStatus: WifiProvisioningStatus.completed,
-          wifiCredentials: _state.wifiCredentials.copyWith(password: ''),
-          clearWifiError: true,
-          clearLastError: true,
-        );
-        notifyListeners();
-        return;
-      } catch (error) {
-        lastError = error;
-        if (attempt + 1 < _maxReconnectAttempts) {
-          await Future<void>.delayed(_reconnectRetryDelay);
-        }
-      }
+  void _setAvailabilityState(BleAvailability availability) {
+    if (availability == BleAvailability.ready) {
+      _setState(const ReadyToScan());
+      return;
     }
+    _setState(BluetoothUnavailable(availability: availability));
+  }
 
-    _setWifiError(
-      message: 'Не вдалося повторно підключитися до контролера через BLE.',
-      operation: WifiProvisioningOperation.reconnectBle,
-      error: lastError ?? StateError('BLE reconnect failed'),
-      status: WifiProvisioningStatus.ready,
-      credentials: _state.wifiCredentials.copyWith(password: ''),
+  void _setState(BleOnboardingState state) {
+    if (_isDisposed) {
+      return;
+    }
+    _state = state;
+    notifyListeners();
+  }
+
+  BleConnectionError _bleError(String message, Object error) {
+    return BleConnectionError(
+      message: message,
+      technicalReason: _safeTechnicalReason(error),
     );
   }
 
-  void _setWifiError({
+  WifiProvisioningError _wifiError({
     required String message,
     required WifiProvisioningOperation operation,
     required Object error,
-    WifiProvisioningStatus? status,
-    WifiCredentials? credentials,
   }) {
-    _state = _state.copyWith(
-      wifiCredentials:
-          credentials ?? _state.wifiCredentials.copyWith(password: ''),
-      wifiStatus: status ?? _state.wifiStatus,
-      wifiError: WifiProvisioningError(
-        message: message,
-        technicalReason: error.runtimeType.toString(),
-        operation: operation,
-      ),
+    return WifiProvisioningError(
+      message: message,
+      technicalReason: _safeTechnicalReason(error),
+      operation: operation,
     );
-    notifyListeners();
   }
 
   String _safeTechnicalReason(Object error) {
@@ -402,16 +456,6 @@ class BleOnboardingController extends ChangeNotifier {
       return raw;
     }
     return '${raw.substring(0, 240)}...';
-  }
-
-  BleConnectionStatus _statusFromAvailability(BleAvailability availability) {
-    return switch (availability) {
-      BleAvailability.ready => BleConnectionStatus.idle,
-      BleAvailability.permissionRequired =>
-        BleConnectionStatus.permissionRequired,
-      BleAvailability.bluetoothDisabled =>
-        BleConnectionStatus.bluetoothDisabled,
-    };
   }
 
   String _hubIdFromBleDeviceId(String bleDeviceId) {
@@ -427,8 +471,8 @@ class BleOnboardingController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _devicesSubscription?.cancel();
-    _statusSubscription?.cancel();
     _bleService.dispose();
     super.dispose();
   }

@@ -25,7 +25,7 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
   final _ssidController = TextEditingController();
   final _passwordController = TextEditingController();
   String? _lastSyncedSsid;
-  WifiProvisioningStatus? _lastWifiStatus;
+  Type? _lastStateType;
 
   @override
   void initState() {
@@ -51,8 +51,10 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Text('Додати контролер',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Додати контролер',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 12),
             _StateBanner(state: state),
             const SizedBox(height: 16),
@@ -119,14 +121,18 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
       _ssidController.text = ssid;
       _lastSyncedSsid = ssid;
     }
-    final status = state.wifiStatus;
-    if (_lastWifiStatus != status &&
-        (status == WifiProvisioningStatus.rebooting ||
-            status == WifiProvisioningStatus.reconnecting ||
-            status == WifiProvisioningStatus.completed)) {
+
+    final stateType = state.runtimeType;
+    final shouldClearPassword = _lastStateType != stateType &&
+        (state is SavingWifiSettings ||
+            state is WaitingForControllerReboot ||
+            state is ReconnectingAfterReboot ||
+            state is ReconnectAfterRebootBlocked ||
+            state is AccessSetupReady);
+    if (shouldClearPassword) {
       _passwordController.clear();
     }
-    _lastWifiStatus = status;
+    _lastStateType = stateType;
   }
 }
 
@@ -160,10 +166,10 @@ class _StateBanner extends StatelessWidget {
                   Text(title, style: textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(message),
-                  if (state.lastError != null) ...[
+                  if (state.bleError != null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      state.lastError!.technicalReason,
+                      state.bleError!.technicalReason,
                       style: textTheme.bodySmall,
                     ),
                   ],
@@ -177,66 +183,111 @@ class _StateBanner extends StatelessWidget {
   }
 
   (String, String, IconData) _copyForState(BleOnboardingState state) {
-    return switch (state.connectionStatus) {
-      BleConnectionStatus.permissionRequired => (
-          'Потрібен дозвіл Bluetooth',
-          'Надайте дозвіл Bluetooth, щоб знайти контролер поливу.',
-          Icons.lock_outline,
+    return switch (state) {
+      CheckingBluetooth() => (
+          'Перевірка Bluetooth',
+          'Перевіряємо доступність Bluetooth і дозволи.',
+          Icons.bluetooth,
         ),
-      BleConnectionStatus.bluetoothDisabled => (
-          'Bluetooth вимкнено',
-          'Увімкніть Bluetooth перед пошуком контролера.',
-          Icons.bluetooth_disabled,
-        ),
-      BleConnectionStatus.scanning => (
+      BluetoothUnavailable(:final availability) => switch (availability) {
+          BleAvailability.permissionRequired => (
+              'Потрібен дозвіл Bluetooth',
+              'Надайте дозвіл Bluetooth, щоб знайти контролер поливу.',
+              Icons.lock_outline,
+            ),
+          BleAvailability.bluetoothDisabled => (
+              'Bluetooth вимкнено',
+              'Увімкніть Bluetooth перед пошуком контролера.',
+              Icons.bluetooth_disabled,
+            ),
+          BleAvailability.ready => (
+              'Готово до пошуку',
+              'Запустіть пошук, щоб знайти контролер поливу.',
+              Icons.bluetooth,
+            ),
+        },
+      ReadyToScan(:final error) => error == null
+          ? (
+              'Готово до пошуку',
+              'Запустіть пошук, щоб знайти контролер поливу.',
+              Icons.bluetooth,
+            )
+          : (
+              'Пошук не запущено',
+              error.message,
+              Icons.error_outline,
+            ),
+      DiscoveringDevices() => (
           'Пошук',
           'Шукаємо поблизу контролери поливу.',
           Icons.radar,
         ),
-      BleConnectionStatus.deviceFound => (
-          'Контролер знайдено',
-          'Виберіть контролер і підключіться, щоб почати сполучення.',
-          Icons.bluetooth_searching,
-        ),
-      BleConnectionStatus.connecting => (
+      DeviceSelected(:final error) => error == null
+          ? (
+              'Контролер вибрано',
+              'Підключіться, щоб почати сполучення.',
+              Icons.bluetooth_searching,
+            )
+          : (
+              'Помилка підключення',
+              error.message,
+              Icons.error_outline,
+            ),
+      ConnectingDevice() => (
           'Підключення',
           'Відкриваємо BLE-з\'єднання з вибраним контролером.',
           Icons.sync,
         ),
-      BleConnectionStatus.reconnecting => (
-          'Повторне підключення',
-          'Очікуємо перезавантаження контролера та відновлюємо BLE-з\'єднання.',
-          Icons.sync,
-        ),
-      BleConnectionStatus.pairingRequired => (
-          'Потрібне сполучення',
-          'Підтвердьте 6-значний код у системному діалозі сполучення.',
-          Icons.pin,
-        ),
-      BleConnectionStatus.pairing => (
+      AwaitingPairingPasskey(:final error) => error == null
+          ? (
+              'Потрібне сполучення',
+              'Підтвердьте 6-значний код у системному діалозі сполучення.',
+              Icons.pin,
+            )
+          : (
+              'Помилка сполучення',
+              error.message,
+              Icons.error_outline,
+            ),
+      PairingInProgress() => (
           'Сполучення',
           'Перевіряємо захищений BLE-сервіс і характеристики.',
           Icons.password,
         ),
-      BleConnectionStatus.connected => (
-          'Сполучення виконано',
-          'BLE-ідентифікатор контролера збережено локально.',
-          Icons.check_circle_outline,
+      ReadingWifiSettings() => (
+          'Читання Wi-Fi',
+          'Читаємо поточну Wi-Fi мережу контролера.',
+          Icons.wifi,
         ),
-      BleConnectionStatus.disconnected => (
-          'Відключено',
-          'Підключіться повторно, щоб продовжити сполучення.',
-          Icons.link_off,
+      WifiCredentialsFormReady() => (
+          'Wi-Fi контролера',
+          'Введіть дані Wi-Fi мережі і збережіть їх у контролер.',
+          Icons.wifi,
         ),
-      BleConnectionStatus.error => (
-          'Помилка BLE',
-          state.lastError?.message ?? 'BLE-операція не виконана.',
+      SavingWifiSettings() => (
+          'Збереження Wi-Fi',
+          'Записуємо Wi-Fi налаштування через BLE.',
+          Icons.save,
+        ),
+      WaitingForControllerReboot() => (
+          'Перезавантаження контролера',
+          'Контролер прийняв налаштування і перезавантажується.',
+          Icons.restart_alt,
+        ),
+      ReconnectingAfterReboot(:final attempt) => (
+          'Повторне підключення',
+          'Відновлюємо BLE-з\'єднання після перезавантаження. Спроба $attempt.',
+          Icons.sync,
+        ),
+      ReconnectAfterRebootBlocked(:final error) => (
+          'Повторне підключення не виконано',
+          error.message,
           Icons.error_outline,
         ),
-      BleConnectionStatus.idle => (
-          'Готово до пошуку',
-          'Запустіть пошук, щоб знайти контролер поливу.',
-          Icons.bluetooth,
+      AccessSetupReady() => (
+          'Wi-Fi збережено',
+          'Наступний крок - читання IP-адреси та токена доступу.',
+          Icons.check_circle_outline,
         ),
     };
   }
@@ -255,13 +306,12 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scanBusy = state.connectionStatus == BleConnectionStatus.scanning ||
-        state.connectionStatus == BleConnectionStatus.connecting ||
-        state.connectionStatus == BleConnectionStatus.reconnecting ||
-        state.connectionStatus == BleConnectionStatus.pairing;
     return Row(
       children: [
-        if (state.connectionStatus == BleConnectionStatus.permissionRequired)
+        if (state
+            case BluetoothUnavailable(
+              availability: BleAvailability.permissionRequired
+            ))
           FilledButton.icon(
             onPressed: onRequestPermissions,
             icon: const Icon(Icons.lock_open),
@@ -269,156 +319,16 @@ class _ActionRow extends StatelessWidget {
           )
         else
           FilledButton.icon(
-            onPressed: scanBusy ? null : onScan,
+            onPressed: _canScan ? onScan : null,
             icon: const Icon(Icons.search),
             label: Text(state.devices.isEmpty ? 'Шукати' : 'Шукати знову'),
           ),
       ],
     );
   }
-}
 
-class _WifiProvisioningPanel extends StatelessWidget {
-  const _WifiProvisioningPanel({
-    required this.state,
-    required this.ssidController,
-    required this.passwordController,
-    required this.onUsePhoneWifi,
-    required this.onReadCurrentSettings,
-    required this.onSave,
-    required this.onOpenNetworkChanged,
-    required this.onRetryReconnect,
-  });
-
-  final BleOnboardingState state;
-  final TextEditingController ssidController;
-  final TextEditingController passwordController;
-  final VoidCallback onUsePhoneWifi;
-  final VoidCallback onReadCurrentSettings;
-  final VoidCallback onSave;
-  final ValueChanged<bool> onOpenNetworkChanged;
-  final VoidCallback onRetryReconnect;
-
-  @override
-  Widget build(BuildContext context) {
-    if (state.step.index < BleOnboardingStep.wifiProvisioning.index) {
-      return const SizedBox.shrink();
-    }
-
-    final busy = state.wifiStatus == WifiProvisioningStatus.reading ||
-        state.wifiStatus == WifiProvisioningStatus.saving ||
-        state.wifiStatus == WifiProvisioningStatus.rebooting ||
-        state.wifiStatus == WifiProvisioningStatus.reconnecting;
-    final openNetwork = state.wifiCredentials.openNetwork;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Wi-Fi контролера',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(_statusText(state.wifiStatus)),
-        if (state.wifiError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            state.wifiError!.message,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ],
-        const SizedBox(height: 12),
-        TextField(
-          controller: ssidController,
-          enabled: !busy,
-          decoration: InputDecoration(
-            labelText: 'Назва Wi-Fi мережі',
-            hintText: 'Наприклад Домашня мережа',
-            errorText: state.wifiValidationErrors['ssid'],
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          value: openNetwork,
-          onChanged: busy ? null : onOpenNetworkChanged,
-          title: const Text('Відкрита мережа без пароля'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: passwordController,
-          enabled: !busy && !openNetwork,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'Пароль Wi-Fi',
-            hintText: openNetwork ? 'Пароль не потрібен' : 'Введіть пароль',
-            errorText: state.wifiValidationErrors['password'],
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: busy ? null : onReadCurrentSettings,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Прочитати з контролера'),
-            ),
-            OutlinedButton.icon(
-              onPressed: busy ? null : onUsePhoneWifi,
-              icon: const Icon(Icons.wifi),
-              label: const Text('Використати поточну Wi-Fi мережу телефону'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: state.canSaveWifi ? onSave : null,
-          icon: busy
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.save),
-          label: const Text('Зберегти Wi-Fi налаштування'),
-        ),
-        if (state.wifiStatus == WifiProvisioningStatus.ready &&
-            state.connectionStatus == BleConnectionStatus.reconnecting) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetryReconnect,
-            icon: const Icon(Icons.replay),
-            label: const Text('Спробувати ще раз'),
-          ),
-        ],
-        if (state.step == BleOnboardingStep.accessBootstrap) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Wi-Fi збережено. Наступний крок - читання IP-адреси та токена доступу.',
-          ),
-        ],
-      ],
-    );
-  }
-
-  String _statusText(WifiProvisioningStatus status) {
-    return switch (status) {
-      WifiProvisioningStatus.idle => 'Готово до читання Wi-Fi налаштувань.',
-      WifiProvisioningStatus.reading =>
-        'Читаємо поточну Wi-Fi мережу контролера.',
-      WifiProvisioningStatus.ready =>
-        'Введіть дані Wi-Fi мережі і збережіть їх у контролер.',
-      WifiProvisioningStatus.saving =>
-        'Записуємо Wi-Fi налаштування через BLE.',
-      WifiProvisioningStatus.rebooting =>
-        'Контролер прийняв налаштування і перезавантажується.',
-      WifiProvisioningStatus.reconnecting =>
-        'Повторно підключаємося до контролера через BLE.',
-      WifiProvisioningStatus.completed => 'Повторне BLE-підключення виконано.',
-    };
+  bool get _canScan {
+    return state is ReadyToScan || state is DeviceSelected;
   }
 }
 
@@ -433,8 +343,12 @@ class _DeviceList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!_shouldShow) {
+      return const SizedBox.shrink();
+    }
+
     if (state.devices.isEmpty) {
-      final message = state.connectionStatus == BleConnectionStatus.scanning
+      final message = state is DiscoveringDevices
           ? 'Контролер ще не знайдено.'
           : 'Контролер не знайдено.';
       return Text(message);
@@ -462,6 +376,15 @@ class _DeviceList extends StatelessWidget {
       ],
     );
   }
+
+  bool get _shouldShow {
+    return state is ReadyToScan ||
+        state is DiscoveringDevices ||
+        state is DeviceSelected ||
+        state is ConnectingDevice ||
+        state is AwaitingPairingPasskey ||
+        state is PairingInProgress;
+  }
 }
 
 class _PairingPanel extends StatelessWidget {
@@ -479,13 +402,16 @@ class _PairingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = state.selectedDevice != null;
-    final canConnect = selected &&
-        (state.connectionStatus == BleConnectionStatus.deviceFound ||
-            state.connectionStatus == BleConnectionStatus.disconnected ||
-            state.connectionStatus == BleConnectionStatus.error);
-    final canPair = selected &&
-        state.connectionStatus == BleConnectionStatus.pairingRequired;
+    if (state.selectedDevice == null ||
+        (state is! DeviceSelected &&
+            state is! ConnectingDevice &&
+            state is! AwaitingPairingPasskey &&
+            state is! PairingInProgress)) {
+      return const SizedBox.shrink();
+    }
+
+    final canConnect = state is DeviceSelected;
+    final canPair = state is AwaitingPairingPasskey;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -515,5 +441,140 @@ class _PairingPanel extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _WifiProvisioningPanel extends StatelessWidget {
+  const _WifiProvisioningPanel({
+    required this.state,
+    required this.ssidController,
+    required this.passwordController,
+    required this.onUsePhoneWifi,
+    required this.onReadCurrentSettings,
+    required this.onSave,
+    required this.onOpenNetworkChanged,
+    required this.onRetryReconnect,
+  });
+
+  final BleOnboardingState state;
+  final TextEditingController ssidController;
+  final TextEditingController passwordController;
+  final VoidCallback onUsePhoneWifi;
+  final VoidCallback onReadCurrentSettings;
+  final VoidCallback onSave;
+  final ValueChanged<bool> onOpenNetworkChanged;
+  final VoidCallback onRetryReconnect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_shouldShow) {
+      return const SizedBox.shrink();
+    }
+
+    final busy = state is ReadingWifiSettings ||
+        state is SavingWifiSettings ||
+        state is WaitingForControllerReboot ||
+        state is ReconnectingAfterReboot;
+    final formReady = state is WifiCredentialsFormReady;
+    final openNetwork = state.wifiCredentials.openNetwork;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Wi-Fi контролера',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        if (state.wifiError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            state.wifiError!.message,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: ssidController,
+          enabled: formReady,
+          decoration: InputDecoration(
+            labelText: 'Назва Wi-Fi мережі',
+            hintText: 'Наприклад Домашня мережа',
+            errorText: state.wifiValidationErrors['ssid'],
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: openNetwork,
+          onChanged: formReady ? onOpenNetworkChanged : null,
+          title: const Text('Відкрита мережа без пароля'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: passwordController,
+          enabled: formReady && !openNetwork,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: 'Пароль Wi-Fi',
+            hintText: openNetwork ? 'Пароль не потрібен' : 'Введіть пароль',
+            errorText: state.wifiValidationErrors['password'],
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: formReady ? onReadCurrentSettings : null,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Прочитати з контролера'),
+            ),
+            OutlinedButton.icon(
+              onPressed: formReady ? onUsePhoneWifi : null,
+              icon: const Icon(Icons.wifi),
+              label: const Text('Використати поточну Wi-Fi мережу телефону'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: state.canSaveWifi ? onSave : null,
+          icon: busy
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save),
+          label: const Text('Зберегти Wi-Fi налаштування'),
+        ),
+        if (state is ReconnectAfterRebootBlocked) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onRetryReconnect,
+            icon: const Icon(Icons.replay),
+            label: const Text('Спробувати ще раз'),
+          ),
+        ],
+        if (state is AccessSetupReady) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'Wi-Fi збережено. Наступний крок - читання IP-адреси та токена доступу.',
+          ),
+        ],
+      ],
+    );
+  }
+
+  bool get _shouldShow {
+    return state is ReadingWifiSettings ||
+        state is WifiCredentialsFormReady ||
+        state is SavingWifiSettings ||
+        state is WaitingForControllerReboot ||
+        state is ReconnectingAfterReboot ||
+        state is ReconnectAfterRebootBlocked ||
+        state is AccessSetupReady;
   }
 }

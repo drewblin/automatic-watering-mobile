@@ -17,7 +17,6 @@ class FlutterReactiveBleService implements BleService {
   final FlutterReactiveBle _ble;
   final _devicesController =
       StreamController<List<BleDiscoveredDevice>>.broadcast();
-  final _statusController = StreamController<BleConnectionStatus>.broadcast();
   final Map<String, BleDiscoveredDevice> _devices = {};
   StreamSubscription<DiscoveredDevice>? _scanSubscription;
   StreamSubscription<ConnectionStateUpdate>? _connectionSubscription;
@@ -27,9 +26,6 @@ class FlutterReactiveBleService implements BleService {
   Stream<List<BleDiscoveredDevice>> get discoveredDevices {
     return _devicesController.stream;
   }
-
-  @override
-  Stream<BleConnectionStatus> get connectionStatus => _statusController.stream;
 
   @override
   Future<BleAvailability> checkAvailability() async {
@@ -63,14 +59,12 @@ class FlutterReactiveBleService implements BleService {
   Future<void> startScan() async {
     final availability = await checkAvailability();
     if (availability != BleAvailability.ready) {
-      _statusController.add(_statusFromAvailability(availability));
       return;
     }
 
     await stopScan();
     _devices.clear();
     _devicesController.add(const []);
-    _statusController.add(BleConnectionStatus.scanning);
 
     _scanSubscription = _ble.scanForDevices(
       withServices: [Uuid.parse(AutomaticWateringBleConstants.serviceUuid)],
@@ -83,11 +77,8 @@ class FlutterReactiveBleService implements BleService {
         }
         _devices[mapped.id] = mapped;
         _devicesController.add(List.unmodifiable(_devices.values));
-        _statusController.add(BleConnectionStatus.deviceFound);
       },
-      onError: (Object error) {
-        _statusController.add(BleConnectionStatus.error);
-      },
+      onError: _devicesController.addError,
     );
   }
 
@@ -101,7 +92,8 @@ class FlutterReactiveBleService implements BleService {
   Future<void> connect(BleDiscoveredDevice device) async {
     await stopScan();
     await _connectionSubscription?.cancel();
-    _statusController.add(BleConnectionStatus.connecting);
+    _connectionSubscription = null;
+    _connectedDeviceId = null;
 
     final completer = Completer<void>();
     _connectionSubscription = _ble
@@ -119,10 +111,9 @@ class FlutterReactiveBleService implements BleService {
       (update) {
         switch (update.connectionState) {
           case DeviceConnectionState.connecting:
-            _statusController.add(BleConnectionStatus.connecting);
+            return;
           case DeviceConnectionState.connected:
             _connectedDeviceId = device.id;
-            _statusController.add(BleConnectionStatus.pairingRequired);
             if (!completer.isCompleted) {
               completer.complete();
             }
@@ -131,7 +122,6 @@ class FlutterReactiveBleService implements BleService {
             if (_connectedDeviceId == device.id) {
               _connectedDeviceId = null;
             }
-            _statusController.add(BleConnectionStatus.disconnected);
             if (!completer.isCompleted) {
               completer.completeError(
                 StateError('BLE device disconnected before pairing'),
@@ -140,7 +130,6 @@ class FlutterReactiveBleService implements BleService {
         }
       },
       onError: (Object error) {
-        _statusController.add(BleConnectionStatus.error);
         if (!completer.isCompleted) {
           completer.completeError(error);
         }
@@ -152,7 +141,6 @@ class FlutterReactiveBleService implements BleService {
 
   @override
   Future<void> reconnect(BleDiscoveredDevice device) async {
-    _statusController.add(BleConnectionStatus.reconnecting);
     await connect(device);
   }
 
@@ -162,17 +150,13 @@ class FlutterReactiveBleService implements BleService {
     required String passkey,
   }) async {
     if (passkey != AutomaticWateringBleConstants.pairingPasskey) {
-      _statusController.add(BleConnectionStatus.error);
       throw ArgumentError('Invalid BLE pairing passkey');
     }
 
-    _statusController.add(BleConnectionStatus.pairing);
     final services = await discoverServices(device.id);
     if (!services.hasAutomaticWateringService) {
-      _statusController.add(BleConnectionStatus.error);
       throw StateError('Expected Automatic Watering BLE service not found');
     }
-    _statusController.add(BleConnectionStatus.connected);
     return services;
   }
 
@@ -184,7 +168,6 @@ class FlutterReactiveBleService implements BleService {
     await _connectionSubscription?.cancel();
     _connectionSubscription = null;
     _connectedDeviceId = null;
-    _statusController.add(BleConnectionStatus.disconnected);
   }
 
   @override
@@ -261,7 +244,6 @@ class FlutterReactiveBleService implements BleService {
     await stopScan();
     await _connectionSubscription?.cancel();
     await _devicesController.close();
-    await _statusController.close();
   }
 
   Future<bool> _hasRequiredPermissions() async {
@@ -275,16 +257,6 @@ class FlutterReactiveBleService implements BleService {
       return false;
     }
     return true;
-  }
-
-  BleConnectionStatus _statusFromAvailability(BleAvailability availability) {
-    return switch (availability) {
-      BleAvailability.ready => BleConnectionStatus.idle,
-      BleAvailability.permissionRequired =>
-        BleConnectionStatus.permissionRequired,
-      BleAvailability.bluetoothDisabled =>
-        BleConnectionStatus.bluetoothDisabled,
-    };
   }
 
   BleDiscoveredDevice _mapDevice(DiscoveredDevice device) {
