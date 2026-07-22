@@ -64,3 +64,41 @@ class BleDeviceServices {
     );
   }
 }
+
+@immutable
+class ControllerIpAddress {
+  const ControllerIpAddress(this.value);
+
+  final String value;
+
+  bool get isPending => value == '0.0.0.0';
+
+  factory ControllerIpAddress.fromJson(Object? data) {
+    if (data is! Map<String, Object?>) {
+      throw FormatException('Expected WifiIpAddress data object');
+    }
+    final ipAddress = data['ipAddress'];
+    if (ipAddress is! String || ipAddress.trim().isEmpty) {
+      throw FormatException('Expected non-empty ipAddress');
+    }
+    return ControllerIpAddress(ipAddress.trim());
+  }
+}
+
+@immutable
+class ControllerApiAccessToken {
+  const ControllerApiAccessToken(this.value);
+
+  final String value;
+
+  factory ControllerApiAccessToken.fromJson(Object? data) {
+    if (data is! Map<String, Object?>) {
+      throw FormatException('Expected ApiAccessToken data object');
+    }
+    final token = data['apiAccessToken'];
+    if (token is! String || token.trim().isEmpty) {
+      throw FormatException('Expected non-empty apiAccessToken');
+    }
+    return ControllerApiAccessToken(token.trim());
+  }
+}

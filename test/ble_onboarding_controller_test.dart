@@ -6,6 +6,7 @@ import 'package:automatic_watering_mobile/app/app_state.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
+import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
@@ -67,6 +68,7 @@ void main() {
         advertisedServiceUuids: {AutomaticWateringBleConstants.serviceUuid},
       ),
     );
+    await controller.connectSelectedDevice();
     await controller.pairSelectedDevice('000000');
 
     expect(controller.state, isA<AwaitingPairingPasskey>());
@@ -87,6 +89,7 @@ void main() {
         lastKnownIpAddress: '192.168.1.50',
         apiAccessToken: 'token',
         serverDeviceId: 'server-device',
+        onboardingCompletedAt: createdAt,
         createdAt: createdAt,
         updatedAt: createdAt,
       );
@@ -213,7 +216,179 @@ void main() {
       WateringHubConnectionState.reconnectingBle,
     );
   });
+
+  test('bootstrap saves IP and secure token then marks hub online', () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final appController = AppController(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+    );
+    await appController.initialize();
+    final bleService = FakeBleService();
+    final localClient = FakeLocalControllerApiClient();
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      appController: appController,
+      localControllerApiClient: localClient,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.pairSelectedDevice(
+      AutomaticWateringBleConstants.pairingPasskey,
+    );
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
+    expect(storage.activeHub?.apiAccessToken, isNull);
+    expect(storage.activeHub?.onboardingCompletedAt, isNotNull);
+    expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
+    expect(localClient.checkedIpAddress, '192.168.1.42');
+    expect(localClient.checkedToken, validToken);
+    expect(
+      appController.state.connectionState,
+      WateringHubConnectionState.online,
+    );
+    expect(appController.state.activeWateringHub?.apiAccessToken, validToken);
+    expect(
+      appController.state.activeWateringHub?.onboardingCompletedAt,
+      isNotNull,
+    );
+  });
+
+  test('bootstrap treats 0.0.0.0 as pending and does not call HTTPS', () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final appController = AppController(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+    );
+    await appController.initialize();
+    final bleService = FakeBleService(
+      wifiIpAddress: const ControllerIpAddress('0.0.0.0'),
+    );
+    final localClient = FakeLocalControllerApiClient();
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      appController: appController,
+      localControllerApiClient: localClient,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.pairSelectedDevice(
+      AutomaticWateringBleConstants.pairingPasskey,
+    );
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerIpPending>());
+    expect(storage.activeHub?.lastKnownIpAddress, '0.0.0.0');
+    expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
+    expect(localClient.checkCalls, 0);
+    expect(
+      appController.state.connectionState,
+      WateringHubConnectionState.ipPending,
+    );
+  });
+
+  test('bootstrap maps HTTPS 401 to tokenInvalid state', () async {
+    final appController = AppController(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+    );
+    await appController.initialize();
+    final controller = BleOnboardingController(
+      bleService: FakeBleService(),
+      appController: appController,
+      localControllerApiClient: FakeLocalControllerApiClient(
+        exception: const LocalControllerApiException(
+          LocalControllerApiErrorKind.tokenInvalid,
+          'Controller rejected API access token',
+        ),
+      ),
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.pairSelectedDevice(
+      AutomaticWateringBleConstants.pairingPasskey,
+    );
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessFailed>());
+    expect(
+      controller.state.controllerAccessError?.kind,
+      ControllerAccessFailureKind.tokenInvalid,
+    );
+    expect(
+      appController.state.connectionState,
+      WateringHubConnectionState.tokenInvalid,
+    );
+  });
+
+  test('controller IP and token parsing trusts controller values', () {
+    expect(
+      ControllerIpAddress.fromJson({'ipAddress': 'controller.local'}).value,
+      'controller.local',
+    );
+    expect(
+      ControllerIpAddress.fromJson({'ipAddress': '192.168.001.42'}).value,
+      '192.168.001.42',
+    );
+    expect(
+      ControllerApiAccessToken.fromJson({'apiAccessToken': 'controller-token'})
+          .value,
+      'controller-token',
+    );
+    expect(
+      ControllerIpAddress.fromJson({'ipAddress': '0.0.0.0'}).isPending,
+      isTrue,
+    );
+  });
+
+  test('token storage stores controller tokens by watering hub id', () async {
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+
+    await tokenStorage.saveApiAccessToken(
+      wateringHubId: 'hub-a',
+      token: validToken,
+    );
+    await tokenStorage.saveApiAccessToken(
+      wateringHubId: 'hub-b',
+      token: otherValidToken,
+    );
+
+    expect(await tokenStorage.readApiAccessToken('hub-a'), validToken);
+    expect(await tokenStorage.readApiAccessToken('hub-b'), otherValidToken);
+
+    await tokenStorage.deleteApiAccessToken('hub-a');
+
+    expect(await tokenStorage.readApiAccessToken('hub-a'), isNull);
+    expect(await tokenStorage.readApiAccessToken('hub-b'), otherValidToken);
+  });
 }
+
+const validToken =
+    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+const otherValidToken =
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 const testDevice = BleDiscoveredDevice(
   id: 'AA:BB:CC',
@@ -226,9 +401,13 @@ const testDevice = BleDiscoveredDevice(
 class FakeBleService implements BleService {
   FakeBleService({
     this.currentWifi = const WifiCredentials(ssid: '', password: ''),
+    this.wifiIpAddress = const ControllerIpAddress('192.168.1.42'),
+    this.apiAccessToken = const ControllerApiAccessToken(validToken),
   });
 
   final WifiCredentials currentWifi;
+  final ControllerIpAddress wifiIpAddress;
+  final ControllerApiAccessToken apiAccessToken;
   WifiCredentials? savedWifiCredentials;
   int disconnectCalls = 0;
   int reconnectCalls = 0;
@@ -281,6 +460,16 @@ class FakeBleService implements BleService {
   }
 
   @override
+  Future<ControllerIpAddress> readWifiIpAddress(String deviceId) async {
+    return wifiIpAddress;
+  }
+
+  @override
+  Future<ControllerApiAccessToken> readApiAccessToken(String deviceId) async {
+    return apiAccessToken;
+  }
+
+  @override
   Future<SaveWifiSettingsResponse> saveWifiSettings({
     required String deviceId,
     required WifiCredentials credentials,
@@ -301,4 +490,27 @@ class FakeBleService implements BleService {
 
   @override
   Future<void> dispose() async {}
+}
+
+class FakeLocalControllerApiClient implements LocalControllerApiClient {
+  FakeLocalControllerApiClient({this.exception});
+
+  final LocalControllerApiException? exception;
+  int checkCalls = 0;
+  String? checkedIpAddress;
+  String? checkedToken;
+
+  @override
+  Future<void> checkSettingsAccess({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    checkCalls += 1;
+    checkedIpAddress = ipAddress;
+    checkedToken = apiAccessToken;
+    final exception = this.exception;
+    if (exception != null) {
+      throw exception;
+    }
+  }
 }

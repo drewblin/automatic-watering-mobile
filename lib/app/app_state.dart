@@ -123,6 +123,78 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveControllerAccess({
+    required WateringHub hub,
+    required String apiAccessToken,
+  }) async {
+    final hubWithoutPlainToken = WateringHub(
+      id: hub.id,
+      displayName: hub.displayName,
+      bleDeviceId: hub.bleDeviceId,
+      lastKnownIpAddress: hub.lastKnownIpAddress,
+      apiAccessToken: null,
+      serverDeviceId: hub.serverDeviceId,
+      onboardingCompletedAt: hub.onboardingCompletedAt,
+      createdAt: hub.createdAt,
+      updatedAt: hub.updatedAt,
+    );
+    final hubWithToken = WateringHub(
+      id: hub.id,
+      displayName: hub.displayName,
+      bleDeviceId: hub.bleDeviceId,
+      lastKnownIpAddress: hub.lastKnownIpAddress,
+      apiAccessToken: apiAccessToken,
+      serverDeviceId: hub.serverDeviceId,
+      onboardingCompletedAt: hub.onboardingCompletedAt,
+      createdAt: hub.createdAt,
+      updatedAt: hub.updatedAt,
+    );
+    await _wateringHubStorage.saveActiveWateringHub(hubWithoutPlainToken);
+    await _tokenStorage.saveApiAccessToken(
+      wateringHubId: hub.id,
+      token: apiAccessToken,
+    );
+    _state = _state.copyWith(
+      startupStatus: AppStartupStatus.ready,
+      activeWateringHub: hubWithToken,
+      connectionState: WateringHubConnectionState.offline,
+      clearLastError: true,
+    );
+    notifyListeners();
+  }
+
+  Future<void> completeOnboarding() async {
+    final hub = _state.activeWateringHub;
+    if (hub == null) {
+      return;
+    }
+    final now = DateTime.now().toUtc();
+    final completedHub = hub.copyWith(
+      onboardingCompletedAt: now,
+      updatedAt: now,
+    );
+    final completedHubWithoutPlainToken = WateringHub(
+      id: completedHub.id,
+      displayName: completedHub.displayName,
+      bleDeviceId: completedHub.bleDeviceId,
+      lastKnownIpAddress: completedHub.lastKnownIpAddress,
+      apiAccessToken: null,
+      serverDeviceId: completedHub.serverDeviceId,
+      onboardingCompletedAt: completedHub.onboardingCompletedAt,
+      createdAt: completedHub.createdAt,
+      updatedAt: completedHub.updatedAt,
+    );
+    await _wateringHubStorage.saveActiveWateringHub(
+      completedHubWithoutPlainToken,
+    );
+    _state = _state.copyWith(
+      activeWateringHub: completedHub,
+      connectionState: WateringHubConnectionState.online,
+      clearLastError: true,
+    );
+    notifyListeners();
+  }
+
   void setConnectionState(WateringHubConnectionState connectionState) {
     _state = _state.copyWith(
       connectionState: connectionState,

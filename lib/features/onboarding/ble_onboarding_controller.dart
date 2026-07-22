@@ -6,6 +6,7 @@ import '../../app/app_state.dart';
 import '../../features/ble/ble_constants.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
+import '../../features/local_controller/local_controller_api_client.dart';
 import '../../features/watering_hubs/watering_hub.dart';
 import '../../features/watering_hubs/watering_hub_state.dart';
 import 'ble_onboarding_state.dart';
@@ -15,11 +16,14 @@ class BleOnboardingController extends ChangeNotifier {
   BleOnboardingController({
     required BleService bleService,
     required AppController appController,
+    LocalControllerApiClient? localControllerApiClient,
     Duration rebootDelay = const Duration(seconds: 3),
     Duration reconnectRetryDelay = const Duration(seconds: 2),
     int maxReconnectAttempts = 5,
   })  : _bleService = bleService,
         _appController = appController,
+        _localControllerApiClient =
+            localControllerApiClient ?? HttpLocalControllerApiClient(),
         _rebootDelay = rebootDelay,
         _reconnectRetryDelay = reconnectRetryDelay,
         _maxReconnectAttempts = maxReconnectAttempts {
@@ -51,6 +55,7 @@ class BleOnboardingController extends ChangeNotifier {
 
   final BleService _bleService;
   final AppController _appController;
+  final LocalControllerApiClient _localControllerApiClient;
   final Duration _rebootDelay;
   final Duration _reconnectRetryDelay;
   final int _maxReconnectAttempts;
@@ -119,10 +124,11 @@ class BleOnboardingController extends ChangeNotifier {
   }
 
   Future<void> connectSelectedDevice() async {
-    final device = _state.selectedDevice;
-    if (device == null) {
+    final state = _state;
+    if (state is! DeviceSelected) {
       return;
     }
+    final device = state.device;
 
     _setState(ConnectingDevice(foundDevices: _devices, device: device));
 
@@ -143,10 +149,11 @@ class BleOnboardingController extends ChangeNotifier {
   }
 
   Future<void> pairSelectedDevice(String passkey) async {
-    final device = _state.selectedDevice;
-    if (device == null) {
+    final state = _state;
+    if (state is! AwaitingPairingPasskey) {
       return;
     }
+    final device = state.device;
 
     if (passkey != AutomaticWateringBleConstants.pairingPasskey) {
       _setState(
@@ -174,7 +181,10 @@ class BleOnboardingController extends ChangeNotifier {
       }
       _isBleConnected = true;
       await _savePairedHub(device);
-      await readCurrentWifiSettings(deviceOverride: device);
+      await _readCurrentWifiSettings(
+        device: device,
+        previousCredentials: WifiCredentials.empty(),
+      );
     } catch (error) {
       _setState(
         AwaitingPairingPasskey(
@@ -218,15 +228,22 @@ class BleOnboardingController extends ChangeNotifier {
     );
   }
 
-  Future<void> readCurrentWifiSettings({
-    BleDiscoveredDevice? deviceOverride,
-  }) async {
-    final device = deviceOverride ?? _state.selectedDevice;
-    if (device == null) {
+  Future<void> readCurrentWifiSettings() async {
+    final state = _state;
+    if (state is! WifiCredentialsFormReady) {
       return;
     }
 
-    final previousCredentials = _state.wifiCredentials.sanitizedForState;
+    await _readCurrentWifiSettings(
+      device: state.device,
+      previousCredentials: state.credentials.sanitizedForState,
+    );
+  }
+
+  Future<void> _readCurrentWifiSettings({
+    required BleDiscoveredDevice device,
+    required WifiCredentials previousCredentials,
+  }) async {
     _setState(ReadingWifiSettings(device: device));
 
     try {
@@ -336,6 +353,154 @@ class BleOnboardingController extends ChangeNotifier {
     await _reconnectAfterReboot(state.device, state.credentials);
   }
 
+  Future<void> bootstrapControllerAccess() async {
+    final state = _state;
+    switch (state) {
+      case AccessSetupReady(:final device, :final credentials):
+      case ControllerIpPending(:final device, :final credentials):
+      case ControllerAccessFailed(:final device, :final credentials):
+        await _bootstrapControllerAccess(
+          device: device,
+          credentials: credentials.sanitizedForState,
+        );
+      default:
+        return;
+    }
+  }
+
+  Future<void> _bootstrapControllerAccess({
+    required BleDiscoveredDevice device,
+    required WifiCredentials credentials,
+  }) async {
+    _setState(
+      ReadingControllerAccess(
+        device: device,
+        credentials: credentials,
+      ),
+    );
+
+    try {
+      if (!_isBleConnected) {
+        _appController.setConnectionState(
+          WateringHubConnectionState.reconnectingBle,
+        );
+        await _bleService.reconnect(device);
+        await _bleService.pairAndDiscoverServices(
+          device: device,
+          passkey: AutomaticWateringBleConstants.pairingPasskey,
+        );
+        _isBleConnected = true;
+      }
+
+      final ipAddress = await _bleService.readWifiIpAddress(device.id);
+      _setState(
+        ReadingControllerAccess(
+          device: device,
+          credentials: credentials,
+          ipAddress: ipAddress.value,
+        ),
+      );
+      final token = await _bleService.readApiAccessToken(device.id);
+
+      final activeHub = _appController.state.activeWateringHub;
+      if (activeHub == null || activeHub.bleDeviceId != device.id) {
+        await _savePairedHub(device);
+      }
+      final hub = (_appController.state.activeWateringHub ??
+              _newHubForDevice(device, DateTime.now().toUtc()))
+          .copyWith(
+        lastKnownIpAddress: ipAddress.value,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await _appController.saveControllerAccess(
+        hub: hub,
+        apiAccessToken: token.value,
+      );
+
+      if (ipAddress.isPending) {
+        _appController.setConnectionState(WateringHubConnectionState.ipPending);
+        _setState(
+          ControllerIpPending(
+            device: device,
+            credentials: credentials,
+            error: const ControllerAccessError(
+              kind: ControllerAccessFailureKind.ipPending,
+              message:
+                  'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.',
+              technicalReason: 'BLE WifiIpAddress returned 0.0.0.0',
+            ),
+          ),
+        );
+        return;
+      }
+
+      _appController.setConnectionState(
+        WateringHubConnectionState.checkingLocalHttps,
+      );
+      _setState(
+        CheckingLocalHttpsAccess(
+          device: device,
+          credentials: credentials,
+          ipAddress: ipAddress.value,
+        ),
+      );
+
+      await _localControllerApiClient.checkSettingsAccess(
+        ipAddress: ipAddress.value,
+        apiAccessToken: token.value,
+      );
+
+      await _appController.completeOnboarding();
+      _setState(
+        ControllerAccessReady(
+          device: device,
+          credentials: credentials,
+          ipAddress: ipAddress.value,
+        ),
+      );
+    } on LocalControllerApiException catch (error) {
+      _handleLocalControllerError(device, credentials, error);
+    } catch (error) {
+      _isBleConnected = false;
+      _appController.setConnectionState(
+        WateringHubConnectionState.requiresBleRecovery,
+      );
+      _setState(
+        ControllerAccessFailed(
+          device: device,
+          credentials: credentials,
+          ipAddress: _state.controllerIpAddress,
+          error: ControllerAccessError(
+            kind: ControllerAccessFailureKind.unexpectedResponse,
+            message:
+                'Не вдалося прочитати IP-адресу або токен доступу через BLE.',
+            technicalReason: _safeTechnicalReason(error),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> returnToWifiProvisioning() async {
+    final state = _state;
+    switch (state) {
+      case AccessSetupReady(:final device, :final credentials):
+      case ReadingControllerAccess(:final device, :final credentials):
+      case CheckingLocalHttpsAccess(:final device, :final credentials):
+      case ControllerIpPending(:final device, :final credentials):
+      case ControllerAccessFailed(:final device, :final credentials):
+      case ControllerAccessReady(:final device, :final credentials):
+        _setState(
+          WifiCredentialsFormReady(
+            device: device,
+            credentials: credentials.sanitizedForState,
+          ),
+        );
+      default:
+        return;
+    }
+  }
+
   Future<void> disconnect() async {
     final deviceId = _state.selectedDevice?.id;
     if (deviceId == null) {
@@ -409,10 +574,85 @@ class BleOnboardingController extends ChangeNotifier {
             lastKnownIpAddress: null,
             apiAccessToken: null,
             serverDeviceId: null,
+            onboardingCompletedAt: null,
             createdAt: now,
             updatedAt: now,
           );
     await _appController.saveActiveWateringHub(hub);
+  }
+
+  WateringHub _newHubForDevice(BleDiscoveredDevice device, DateTime now) {
+    return WateringHub(
+      id: _hubIdFromBleDeviceId(device.id),
+      displayName: device.displayName,
+      bleDeviceId: device.id,
+      lastKnownIpAddress: null,
+      apiAccessToken: null,
+      serverDeviceId: null,
+      onboardingCompletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  void _handleLocalControllerError(
+    BleDiscoveredDevice device,
+    WifiCredentials credentials,
+    LocalControllerApiException error,
+  ) {
+    final kind = switch (error.kind) {
+      LocalControllerApiErrorKind.networkUnavailable =>
+        ControllerAccessFailureKind.networkUnavailable,
+      LocalControllerApiErrorKind.tlsCertificate =>
+        ControllerAccessFailureKind.tlsCertificate,
+      LocalControllerApiErrorKind.tokenInvalid =>
+        ControllerAccessFailureKind.tokenInvalid,
+      LocalControllerApiErrorKind.controllerUnavailable =>
+        ControllerAccessFailureKind.controllerUnavailable,
+      LocalControllerApiErrorKind.unexpectedResponse =>
+        ControllerAccessFailureKind.unexpectedResponse,
+    };
+    final connectionState = switch (error.kind) {
+      LocalControllerApiErrorKind.tokenInvalid =>
+        WateringHubConnectionState.tokenInvalid,
+      LocalControllerApiErrorKind.networkUnavailable ||
+      LocalControllerApiErrorKind.tlsCertificate ||
+      LocalControllerApiErrorKind.controllerUnavailable =>
+        WateringHubConnectionState.httpsUnavailable,
+      LocalControllerApiErrorKind.unexpectedResponse =>
+        WateringHubConnectionState.httpsUnavailable,
+    };
+    _appController.setConnectionState(connectionState);
+    _setState(
+      ControllerAccessFailed(
+        device: device,
+        credentials: credentials,
+        ipAddress: _state.controllerIpAddress,
+        error: ControllerAccessError(
+          kind: kind,
+          message: _controllerAccessMessage(kind),
+          technicalReason: error.message,
+        ),
+      ),
+    );
+  }
+
+  String _controllerAccessMessage(ControllerAccessFailureKind kind) {
+    return switch (kind) {
+      ControllerAccessFailureKind.ipPending =>
+        'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.',
+      ControllerAccessFailureKind.tokenInvalid =>
+        'Контролер відхилив токен доступу. Потрібно повторно прочитати token через BLE.',
+      ControllerAccessFailureKind.timeout ||
+      ControllerAccessFailureKind.networkUnavailable =>
+        'Не вдалося підключитися до локального HTTPS API. Перевірте, що телефон у тій самій Wi-Fi мережі.',
+      ControllerAccessFailureKind.tlsCertificate =>
+        'TLS-сертифікат контролера не пройшов перевірку fingerprint.',
+      ControllerAccessFailureKind.controllerUnavailable =>
+        'Контролер тимчасово недоступний через HTTPS API.',
+      ControllerAccessFailureKind.unexpectedResponse =>
+        'Контролер повернув неочікувану відповідь на GET /api/settings.',
+    };
   }
 
   void _setAvailabilityState(BleAvailability availability) {

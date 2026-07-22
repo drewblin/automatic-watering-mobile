@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  crypto: ^3.0.6
   flutter_reactive_ble: ^5.4.0
   flutter_secure_storage: ^9.2.4
   permission_handler: ^11.3.1

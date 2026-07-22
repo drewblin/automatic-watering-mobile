@@ -20,6 +20,10 @@ sealed class BleOnboardingState {
   Map<String, String> get wifiValidationErrors => const {};
 
   bool get canSaveWifi => false;
+
+  String? get controllerIpAddress => null;
+
+  ControllerAccessError? get controllerAccessError => null;
 }
 
 final class CheckingBluetooth extends BleOnboardingState {
@@ -247,4 +251,140 @@ final class AccessSetupReady extends BleOnboardingState {
 
   @override
   WifiCredentials get wifiCredentials => credentials;
+}
+
+enum ControllerAccessFailureKind {
+  ipPending,
+  tokenInvalid,
+  timeout,
+  tlsCertificate,
+  networkUnavailable,
+  controllerUnavailable,
+  unexpectedResponse,
+}
+
+@immutable
+class ControllerAccessError {
+  const ControllerAccessError({
+    required this.kind,
+    required this.message,
+    required this.technicalReason,
+  });
+
+  final ControllerAccessFailureKind kind;
+  final String message;
+  final String technicalReason;
+}
+
+final class ReadingControllerAccess extends BleOnboardingState {
+  ReadingControllerAccess({
+    required this.device,
+    required this.credentials,
+    this.ipAddress,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final String? ipAddress;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  String? get controllerIpAddress => ipAddress;
+}
+
+final class CheckingLocalHttpsAccess extends BleOnboardingState {
+  CheckingLocalHttpsAccess({
+    required this.device,
+    required this.credentials,
+    required this.ipAddress,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final String ipAddress;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  String? get controllerIpAddress => ipAddress;
+}
+
+final class ControllerIpPending extends BleOnboardingState {
+  ControllerIpPending({
+    required this.device,
+    required this.credentials,
+    required this.error,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final ControllerAccessError error;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  String? get controllerIpAddress => '0.0.0.0';
+
+  @override
+  ControllerAccessError? get controllerAccessError => error;
+}
+
+final class ControllerAccessFailed extends BleOnboardingState {
+  ControllerAccessFailed({
+    required this.device,
+    required this.credentials,
+    required this.ipAddress,
+    required this.error,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final String? ipAddress;
+  final ControllerAccessError error;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  String? get controllerIpAddress => ipAddress;
+
+  @override
+  ControllerAccessError? get controllerAccessError => error;
+}
+
+final class ControllerAccessReady extends BleOnboardingState {
+  ControllerAccessReady({
+    required this.device,
+    required this.credentials,
+    required this.ipAddress,
+  }) : assert(credentials.password == '');
+
+  final BleDiscoveredDevice device;
+  final WifiCredentials credentials;
+  final String ipAddress;
+
+  @override
+  BleDiscoveredDevice? get selectedDevice => device;
+
+  @override
+  WifiCredentials get wifiCredentials => credentials;
+
+  @override
+  String? get controllerIpAddress => ipAddress;
 }

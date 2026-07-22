@@ -27,6 +27,10 @@ abstract interface class BleService {
 
   Future<WifiCredentials> readWifiSettings(String deviceId);
 
+  Future<ControllerIpAddress> readWifiIpAddress(String deviceId);
+
+  Future<ControllerApiAccessToken> readApiAccessToken(String deviceId);
+
   Future<SaveWifiSettingsResponse> saveWifiSettings({
     required String deviceId,
     required WifiCredentials credentials,

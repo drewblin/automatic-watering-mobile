@@ -8,6 +8,7 @@ class WateringHub {
     required this.lastKnownIpAddress,
     required this.apiAccessToken,
     required this.serverDeviceId,
+    required this.onboardingCompletedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -18,8 +19,11 @@ class WateringHub {
   final String? lastKnownIpAddress;
   final String? apiAccessToken;
   final String? serverDeviceId;
+  final DateTime? onboardingCompletedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  bool get isOnboardingComplete => onboardingCompletedAt != null;
 
   factory WateringHub.fromJson(Map<String, Object?> json) {
     return WateringHub(
@@ -29,6 +33,10 @@ class WateringHub {
       lastKnownIpAddress: json['lastKnownIpAddress'] as String?,
       apiAccessToken: null,
       serverDeviceId: json['serverDeviceId'] as String?,
+      onboardingCompletedAt: json['onboardingCompletedAt'] == null
+          ? null
+          : readDateTime(
+              json['onboardingCompletedAt'], 'onboardingCompletedAt'),
       createdAt: readDateTime(json['createdAt'], 'createdAt'),
       updatedAt: readDateTime(json['updatedAt'], 'updatedAt'),
     );
@@ -41,6 +49,7 @@ class WateringHub {
       'bleDeviceId': bleDeviceId,
       'lastKnownIpAddress': lastKnownIpAddress,
       'serverDeviceId': serverDeviceId,
+      'onboardingCompletedAt': onboardingCompletedAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -53,6 +62,7 @@ class WateringHub {
     String? lastKnownIpAddress,
     String? apiAccessToken,
     String? serverDeviceId,
+    DateTime? onboardingCompletedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -63,6 +73,8 @@ class WateringHub {
       lastKnownIpAddress: lastKnownIpAddress ?? this.lastKnownIpAddress,
       apiAccessToken: apiAccessToken ?? this.apiAccessToken,
       serverDeviceId: serverDeviceId ?? this.serverDeviceId,
+      onboardingCompletedAt:
+          onboardingCompletedAt ?? this.onboardingCompletedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

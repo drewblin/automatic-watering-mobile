@@ -215,6 +215,44 @@ class FlutterReactiveBleService implements BleService {
   }
 
   @override
+  Future<ControllerIpAddress> readWifiIpAddress(String deviceId) async {
+    _ensureConnected(deviceId);
+    final value = await _ble.readCharacteristic(
+      _qualifiedCharacteristic(
+        deviceId,
+        AutomaticWateringBleConstants.wifiIpAddress.uuid,
+      ),
+    );
+    final envelope = _decodeEnvelope<ControllerIpAddress>(
+      value,
+      ControllerIpAddress.fromJson,
+    );
+    if (!envelope.success) {
+      throw StateError(envelope.error ?? 'Wi-Fi IP address read failed');
+    }
+    return envelope.data;
+  }
+
+  @override
+  Future<ControllerApiAccessToken> readApiAccessToken(String deviceId) async {
+    _ensureConnected(deviceId);
+    final value = await _ble.readCharacteristic(
+      _qualifiedCharacteristic(
+        deviceId,
+        AutomaticWateringBleConstants.apiAccessToken.uuid,
+      ),
+    );
+    final envelope = _decodeEnvelope<ControllerApiAccessToken>(
+      value,
+      ControllerApiAccessToken.fromJson,
+    );
+    if (!envelope.success) {
+      throw StateError(envelope.error ?? 'API access token read failed');
+    }
+    return envelope.data;
+  }
+
+  @override
   Future<SaveWifiSettingsResponse> saveWifiSettings({
     required String deviceId,
     required WifiCredentials credentials,

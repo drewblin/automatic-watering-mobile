@@ -98,16 +98,25 @@ class _ReadyStatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hub = state.activeWateringHub;
-    if (hub == null) {
+    if (_shouldShowOnboarding) {
       return BleOnboardingScreen(
         controller: bleOnboardingController,
       );
     }
 
+    final readyHub = hub!;
     return _StatusPanel(
-      title: hub.displayName,
+      title: readyHub.displayName,
       subtitle: 'Стан контролера: ${state.connectionState.label}',
     );
+  }
+
+  bool get _shouldShowOnboarding {
+    final hub = state.activeWateringHub;
+    if (hub == null) {
+      return true;
+    }
+    return !hub.isOnboardingComplete || hub.apiAccessToken == null;
   }
 }
 

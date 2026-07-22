@@ -30,7 +30,12 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
   @override
   void initState() {
     super.initState();
-    widget.controller.checkAvailability();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      widget.controller.checkAvailability();
+    });
   }
 
   @override
@@ -109,6 +114,12 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
               },
               onRetryReconnect: widget.controller.retryWifiReconnect,
             ),
+            const SizedBox(height: 16),
+            _ControllerAccessPanel(
+              state: state,
+              onBootstrap: widget.controller.bootstrapControllerAccess,
+              onBackToWifi: widget.controller.returnToWifiProvisioning,
+            ),
           ],
         );
       },
@@ -128,7 +139,12 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
             state is WaitingForControllerReboot ||
             state is ReconnectingAfterReboot ||
             state is ReconnectAfterRebootBlocked ||
-            state is AccessSetupReady);
+            state is AccessSetupReady ||
+            state is ReadingControllerAccess ||
+            state is CheckingLocalHttpsAccess ||
+            state is ControllerIpPending ||
+            state is ControllerAccessFailed ||
+            state is ControllerAccessReady);
     if (shouldClearPassword) {
       _passwordController.clear();
     }
@@ -289,6 +305,33 @@ class _StateBanner extends StatelessWidget {
           'Наступний крок - читання IP-адреси та токена доступу.',
           Icons.check_circle_outline,
         ),
+      ReadingControllerAccess(:final ipAddress) => (
+          'Читання доступу',
+          ipAddress == null
+              ? 'Читаємо IP-адресу контролера через BLE.'
+              : 'IP-адресу отримано: $ipAddress. Читаємо token доступу.',
+          Icons.vpn_key,
+        ),
+      CheckingLocalHttpsAccess(:final ipAddress) => (
+          'Перевірка HTTPS',
+          'Перевіряємо локальний HTTPS API контролера за адресою $ipAddress.',
+          Icons.https,
+        ),
+      ControllerIpPending(:final error) => (
+          'IP-адреса очікується',
+          error.message,
+          Icons.hourglass_empty,
+        ),
+      ControllerAccessFailed(:final error) => (
+          'Доступ не перевірено',
+          error.message,
+          Icons.error_outline,
+        ),
+      ControllerAccessReady(:final ipAddress) => (
+          'Контролер доступний',
+          'Локальний HTTPS API перевірено за адресою $ipAddress.',
+          Icons.check_circle,
+        ),
     };
   }
 }
@@ -402,13 +445,15 @@ class _PairingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.selectedDevice == null ||
-        (state is! DeviceSelected &&
-            state is! ConnectingDevice &&
-            state is! AwaitingPairingPasskey &&
-            state is! PairingInProgress)) {
-      return const SizedBox.shrink();
-    }
+    final shouldShow = switch (state) {
+      DeviceSelected() ||
+      ConnectingDevice() ||
+      AwaitingPairingPasskey() ||
+      PairingInProgress() =>
+        true,
+      _ => false,
+    };
+    if (!shouldShow) return const SizedBox.shrink();
 
     final canConnect = state is DeviceSelected;
     final canPair = state is AwaitingPairingPasskey;
@@ -558,12 +603,6 @@ class _WifiProvisioningPanel extends StatelessWidget {
             label: const Text('Спробувати ще раз'),
           ),
         ],
-        if (state is AccessSetupReady) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Wi-Fi збережено. Наступний крок - читання IP-адреси та токена доступу.',
-          ),
-        ],
       ],
     );
   }
@@ -574,7 +613,167 @@ class _WifiProvisioningPanel extends StatelessWidget {
         state is SavingWifiSettings ||
         state is WaitingForControllerReboot ||
         state is ReconnectingAfterReboot ||
-        state is ReconnectAfterRebootBlocked ||
-        state is AccessSetupReady;
+        state is ReconnectAfterRebootBlocked;
+  }
+}
+
+class _ControllerAccessPanel extends StatelessWidget {
+  const _ControllerAccessPanel({
+    required this.state,
+    required this.onBootstrap,
+    required this.onBackToWifi,
+  });
+
+  final BleOnboardingState state;
+  final VoidCallback onBootstrap;
+  final VoidCallback onBackToWifi;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_shouldShow) {
+      return const SizedBox.shrink();
+    }
+
+    final busy =
+        state is ReadingControllerAccess || state is CheckingLocalHttpsAccess;
+    final canRetry = state is AccessSetupReady ||
+        state is ControllerIpPending ||
+        state is ControllerAccessFailed;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Доступ до контролера',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 12),
+        _AccessStatusRow(
+          icon: Icons.router,
+          label: 'IP-адреса',
+          value: state.controllerIpAddress ?? 'Ще не прочитано',
+        ),
+        const SizedBox(height: 8),
+        _AccessStatusRow(
+          icon: Icons.vpn_key,
+          label: 'Token доступу',
+          value: _tokenStatus,
+        ),
+        const SizedBox(height: 8),
+        _AccessStatusRow(
+          icon: Icons.https,
+          label: 'HTTPS API',
+          value: _httpsStatus,
+        ),
+        if (state.controllerAccessError != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            state.controllerAccessError!.technicalReason,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: canRetry ? onBootstrap : null,
+              icon: busy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(state is AccessSetupReady
+                  ? 'Прочитати IP і token'
+                  : 'Повторити читання'),
+            ),
+            OutlinedButton.icon(
+              onPressed: busy ? null : onBackToWifi,
+              icon: const Icon(Icons.wifi),
+              label: const Text('Повернутися до Wi-Fi'),
+            ),
+          ],
+        ),
+        if (state is ControllerAccessReady) ...[
+          const SizedBox(height: 12),
+          const Text('Можна переходити до базового налаштування системи.'),
+        ],
+      ],
+    );
+  }
+
+  String get _tokenStatus {
+    return switch (state) {
+      ReadingControllerAccess(:final ipAddress) =>
+        ipAddress == null ? 'Очікує IP-адресу' : 'Читаємо через BLE',
+      CheckingLocalHttpsAccess() ||
+      ControllerIpPending() ||
+      ControllerAccessReady() =>
+        'Збережено в захищеному сховищі',
+      ControllerAccessFailed(:final error)
+          when error.kind == ControllerAccessFailureKind.tokenInvalid =>
+        'Контролер відхилив token',
+      ControllerAccessFailed() => 'Прочитано, потрібна повторна перевірка',
+      _ => 'Ще не прочитано',
+    };
+  }
+
+  String get _httpsStatus {
+    return switch (state) {
+      CheckingLocalHttpsAccess() => 'Перевіряємо GET /api/settings',
+      ControllerAccessReady() => 'Перевірено',
+      ControllerIpPending() => 'Очікує IP-адресу Wi-Fi',
+      ControllerAccessFailed(:final error) => switch (error.kind) {
+          ControllerAccessFailureKind.tlsCertificate =>
+            'Помилка TLS/fingerprint',
+          ControllerAccessFailureKind.tokenInvalid => 'Помилка 401',
+          ControllerAccessFailureKind.networkUnavailable ||
+          ControllerAccessFailureKind.timeout =>
+            'Timeout або мережа недоступна',
+          ControllerAccessFailureKind.controllerUnavailable =>
+            'Контролер недоступний',
+          ControllerAccessFailureKind.ipPending => 'Очікує IP-адресу Wi-Fi',
+          ControllerAccessFailureKind.unexpectedResponse =>
+            'Неочікувана відповідь',
+        },
+      _ => 'Ще не перевірено',
+    };
+  }
+
+  bool get _shouldShow {
+    return state is AccessSetupReady ||
+        state is ReadingControllerAccess ||
+        state is CheckingLocalHttpsAccess ||
+        state is ControllerIpPending ||
+        state is ControllerAccessFailed ||
+        state is ControllerAccessReady;
+  }
+}
+
+class _AccessStatusRow extends StatelessWidget {
+  const _AccessStatusRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text('$label: $value'),
+        ),
+      ],
+    );
   }
 }
