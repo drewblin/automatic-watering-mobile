@@ -6,12 +6,13 @@ enum WateringStartMode {
 
   static WateringStartMode fromJson(Object? value) {
     if (value is String) {
-      return WateringStartMode.values.firstWhere(
-        (mode) => mode.name == value,
-        orElse: () => WateringStartMode.immediately,
-      );
+      for (final mode in WateringStartMode.values) {
+        if (mode.name == value) {
+          return mode;
+        }
+      }
     }
-    throw const FormatException('Missing or invalid wateringStartMode');
+    throw FormatException('Missing or invalid wateringStartMode: $value');
   }
 
   String toJson() => name;
@@ -27,12 +28,10 @@ class TimeOfDaySetting {
   final int minute;
 
   factory TimeOfDaySetting.fromJson(Map<String, Object?> json) {
-    final hour = readInt(json['hour'], 'hour');
-    final minute = readInt(json['minute'], 'minute');
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-      throw const FormatException('Invalid time of day setting');
-    }
-    return TimeOfDaySetting(hour: hour, minute: minute);
+    return TimeOfDaySetting(
+      hour: readInt(json['hour'], 'hour'),
+      minute: readInt(json['minute'], 'minute'),
+    );
   }
 
   Map<String, Object?> toJson() => {'hour': hour, 'minute': minute};
@@ -241,14 +240,10 @@ class WaterCounterSetting {
   final double litersPerTick;
 
   factory WaterCounterSetting.fromJson(Map<String, Object?> json) {
-    final litersPerTick = readDouble(json['litersPerTick'], 'litersPerTick');
-    if (!litersPerTick.isFinite || litersPerTick <= 0) {
-      throw const FormatException('litersPerTick must be positive and finite');
-    }
     return WaterCounterSetting(
       pin: readInt(json['pin'], 'pin'),
       name: readString(json['name'], 'name'),
-      litersPerTick: litersPerTick,
+      litersPerTick: readDouble(json['litersPerTick'], 'litersPerTick'),
     );
   }
 

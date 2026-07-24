@@ -1,14 +1,14 @@
-import 'package:flutter/foundation.dart';
-
+import '../features/controller_settings/controller_settings.dart';
+import '../features/controller_settings/device_objects.dart';
+import '../features/controller_settings/settings_response_data.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';
 import '../features/watering_hubs/watering_hub_state.dart';
-import '../storage/watering_hub_storage.dart';
 
 enum AppStartupStatus {
   initializing,
+  onboarding,
   ready,
-  failed,
 }
 
 class AppState {
@@ -17,16 +17,51 @@ class AppState {
     required this.activeWateringHub,
     required this.activePlanSchema,
     required this.connectionState,
-    required this.lastError,
+    required this.settings,
+    required this.deviceObjects,
   });
 
-  factory AppState.initial() {
-    return const AppState(
+  factory AppState.loading({
+    required WateringHub? activeWateringHub,
+    required WateringHubConnectionState connectionState,
+  }) {
+    return AppState(
       startupStatus: AppStartupStatus.initializing,
-      activeWateringHub: null,
+      activeWateringHub: activeWateringHub,
       activePlanSchema: null,
-      connectionState: WateringHubConnectionState.noDevice,
-      lastError: null,
+      connectionState: connectionState,
+      settings: null,
+      deviceObjects: const [],
+    );
+  }
+
+  factory AppState.readyForOnboarding({
+    required WateringHub? activeWateringHub,
+    required WateringHubConnectionState connectionState,
+  }) {
+    return AppState(
+      startupStatus: AppStartupStatus.onboarding,
+      activeWateringHub: activeWateringHub,
+      activePlanSchema: null,
+      connectionState: connectionState,
+      settings: null,
+      deviceObjects: const [],
+    );
+  }
+
+  factory AppState.readyWithHub({
+    required WateringHub activeWateringHub,
+    required PlanSchema? activePlanSchema,
+    required SettingsResponseData settings,
+    required List<DeviceObject> deviceObjects,
+  }) {
+    return AppState(
+      startupStatus: AppStartupStatus.ready,
+      activeWateringHub: activeWateringHub,
+      activePlanSchema: activePlanSchema,
+      connectionState: WateringHubConnectionState.online,
+      settings: settings,
+      deviceObjects: deviceObjects,
     );
   }
 
@@ -34,17 +69,37 @@ class AppState {
   final WateringHub? activeWateringHub;
   final PlanSchema? activePlanSchema;
   final WateringHubConnectionState connectionState;
-  final Object? lastError;
+  final SettingsResponseData? settings;
+  final List<DeviceObject> deviceObjects;
+
+  ControllerSettings? get controllerSettings => settings?.settings;
+
+  WateringHub get readyWateringHub {
+    final hub = activeWateringHub;
+    if (startupStatus != AppStartupStatus.ready || hub == null) {
+      throw StateError('AppState is not ready with a watering hub.');
+    }
+    return hub;
+  }
+
+  SettingsResponseData get readySettings {
+    final currentSettings = settings;
+    if (startupStatus != AppStartupStatus.ready || currentSettings == null) {
+      throw StateError('AppState is not ready with controller settings.');
+    }
+    return currentSettings;
+  }
 
   AppState copyWith({
     AppStartupStatus? startupStatus,
     WateringHub? activeWateringHub,
     PlanSchema? activePlanSchema,
     WateringHubConnectionState? connectionState,
-    Object? lastError,
+    SettingsResponseData? settings,
+    List<DeviceObject>? deviceObjects,
     bool clearWateringHub = false,
     bool clearPlanSchema = false,
-    bool clearLastError = false,
+    bool clearSettings = false,
   }) {
     return AppState(
       startupStatus: startupStatus ?? this.startupStatus,
@@ -53,153 +108,9 @@ class AppState {
       activePlanSchema:
           clearPlanSchema ? null : activePlanSchema ?? this.activePlanSchema,
       connectionState: connectionState ?? this.connectionState,
-      lastError: clearLastError ? null : lastError ?? this.lastError,
+      settings: clearSettings ? null : settings ?? this.settings,
+      deviceObjects:
+          clearSettings ? const [] : deviceObjects ?? this.deviceObjects,
     );
-  }
-}
-
-class AppController extends ChangeNotifier {
-  AppController({
-    required WateringHubStorage wateringHubStorage,
-    required WateringHubTokenStorage tokenStorage,
-  })  : _wateringHubStorage = wateringHubStorage,
-        _tokenStorage = tokenStorage;
-
-  final WateringHubStorage _wateringHubStorage;
-  final WateringHubTokenStorage _tokenStorage;
-
-  AppState _state = AppState.initial();
-
-  AppState get state => _state;
-
-  Future<void> initialize() async {
-    _state = AppState.initial();
-    notifyListeners();
-
-    try {
-      final hubWithoutToken = await _wateringHubStorage.readActiveWateringHub();
-      if (hubWithoutToken == null) {
-        _state = _state.copyWith(
-          startupStatus: AppStartupStatus.ready,
-          connectionState: WateringHubConnectionState.noDevice,
-          clearWateringHub: true,
-          clearPlanSchema: true,
-          clearLastError: true,
-        );
-        notifyListeners();
-        return;
-      }
-
-      final token = await _tokenStorage.readApiAccessToken(hubWithoutToken.id);
-      final hub = hubWithoutToken.copyWith(apiAccessToken: token);
-      final planSchema = await _wateringHubStorage.readPlanSchema(hub.id);
-
-      _state = _state.copyWith(
-        startupStatus: AppStartupStatus.ready,
-        activeWateringHub: hub,
-        activePlanSchema: planSchema,
-        connectionState: WateringHubConnectionState.offline,
-        clearLastError: true,
-      );
-      notifyListeners();
-    } catch (error) {
-      _state = _state.copyWith(
-        startupStatus: AppStartupStatus.failed,
-        connectionState: WateringHubConnectionState.offline,
-        lastError: error,
-      );
-      notifyListeners();
-    }
-  }
-
-  Future<void> saveActiveWateringHub(WateringHub hub) async {
-    await _wateringHubStorage.saveActiveWateringHub(hub);
-    _state = _state.copyWith(
-      startupStatus: AppStartupStatus.ready,
-      activeWateringHub: hub,
-      connectionState: WateringHubConnectionState.offline,
-      clearLastError: true,
-    );
-    notifyListeners();
-  }
-
-  Future<void> saveControllerAccess({
-    required WateringHub hub,
-    required String apiAccessToken,
-  }) async {
-    final hubWithoutPlainToken = WateringHub(
-      id: hub.id,
-      displayName: hub.displayName,
-      bleDeviceId: hub.bleDeviceId,
-      lastKnownIpAddress: hub.lastKnownIpAddress,
-      apiAccessToken: null,
-      serverDeviceId: hub.serverDeviceId,
-      onboardingCompletedAt: hub.onboardingCompletedAt,
-      createdAt: hub.createdAt,
-      updatedAt: hub.updatedAt,
-    );
-    final hubWithToken = WateringHub(
-      id: hub.id,
-      displayName: hub.displayName,
-      bleDeviceId: hub.bleDeviceId,
-      lastKnownIpAddress: hub.lastKnownIpAddress,
-      apiAccessToken: apiAccessToken,
-      serverDeviceId: hub.serverDeviceId,
-      onboardingCompletedAt: hub.onboardingCompletedAt,
-      createdAt: hub.createdAt,
-      updatedAt: hub.updatedAt,
-    );
-    await _wateringHubStorage.saveActiveWateringHub(hubWithoutPlainToken);
-    await _tokenStorage.saveApiAccessToken(
-      wateringHubId: hub.id,
-      token: apiAccessToken,
-    );
-    _state = _state.copyWith(
-      startupStatus: AppStartupStatus.ready,
-      activeWateringHub: hubWithToken,
-      connectionState: WateringHubConnectionState.offline,
-      clearLastError: true,
-    );
-    notifyListeners();
-  }
-
-  Future<void> completeOnboarding() async {
-    final hub = _state.activeWateringHub;
-    if (hub == null) {
-      return;
-    }
-    final now = DateTime.now().toUtc();
-    final completedHub = hub.copyWith(
-      onboardingCompletedAt: now,
-      updatedAt: now,
-    );
-    final completedHubWithoutPlainToken = WateringHub(
-      id: completedHub.id,
-      displayName: completedHub.displayName,
-      bleDeviceId: completedHub.bleDeviceId,
-      lastKnownIpAddress: completedHub.lastKnownIpAddress,
-      apiAccessToken: null,
-      serverDeviceId: completedHub.serverDeviceId,
-      onboardingCompletedAt: completedHub.onboardingCompletedAt,
-      createdAt: completedHub.createdAt,
-      updatedAt: completedHub.updatedAt,
-    );
-    await _wateringHubStorage.saveActiveWateringHub(
-      completedHubWithoutPlainToken,
-    );
-    _state = _state.copyWith(
-      activeWateringHub: completedHub,
-      connectionState: WateringHubConnectionState.online,
-      clearLastError: true,
-    );
-    notifyListeners();
-  }
-
-  void setConnectionState(WateringHubConnectionState connectionState) {
-    _state = _state.copyWith(
-      connectionState: connectionState,
-      clearLastError: true,
-    );
-    notifyListeners();
   }
 }

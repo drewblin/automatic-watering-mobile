@@ -1,37 +1,93 @@
 import 'package:flutter/material.dart';
 
+import '../features/home/home_screen.dart';
 import '../features/onboarding/ble_onboarding_controller.dart';
-import '../features/onboarding/ble_onboarding_screen.dart';
-import '../features/watering_hubs/watering_hub_state.dart';
-import 'app_state.dart';
+import 'app_controller.dart';
+import 'fatal_error_screen.dart';
 
 class AutomaticWateringApp extends StatefulWidget {
   const AutomaticWateringApp({
     required this.appController,
     required this.bleOnboardingController,
+    this.fatalErrorListenable,
     super.key,
   });
 
   final AppController appController;
   final BleOnboardingController bleOnboardingController;
+  final ValueNotifier<Object?>? fatalErrorListenable;
 
   @override
   State<AutomaticWateringApp> createState() => _AutomaticWateringAppState();
 }
 
 class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
+  Object? _fatalError;
+
   @override
   void initState() {
     super.initState();
-    widget.appController.initialize();
+    widget.fatalErrorListenable?.addListener(_handleExternalFatalError);
+    _initialize();
   }
 
   @override
   void didUpdateWidget(AutomaticWateringApp oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.appController != oldWidget.appController) {
-      widget.appController.initialize();
+    if (widget.fatalErrorListenable != oldWidget.fatalErrorListenable) {
+      oldWidget.fatalErrorListenable?.removeListener(_handleExternalFatalError);
+      widget.fatalErrorListenable?.addListener(_handleExternalFatalError);
+      _handleExternalFatalError();
     }
+    if (widget.appController != oldWidget.appController) {
+      _initialize();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.fatalErrorListenable?.removeListener(_handleExternalFatalError);
+    super.dispose();
+  }
+
+  Future<void> _initialize() async {
+    try {
+      await widget.appController.initialize();
+      if (mounted && _fatalError != null) {
+        setState(() {
+          _fatalError = null;
+        });
+      }
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stackTrace),
+      );
+      if (mounted) {
+        setState(() {
+          _fatalError = error;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryInitialize() async {
+    widget.fatalErrorListenable?.value = null;
+    if (mounted) {
+      setState(() {
+        _fatalError = null;
+      });
+    }
+    await _initialize();
+  }
+
+  void _handleExternalFatalError() {
+    final error = widget.fatalErrorListenable?.value;
+    if (error == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _fatalError = error;
+    });
   }
 
   @override
@@ -45,6 +101,13 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
       home: AnimatedBuilder(
         animation: widget.appController,
         builder: (context, _) {
+          final fatalError = _fatalError;
+          if (fatalError != null) {
+            return FatalErrorScreen(
+              error: fatalError,
+              onRetry: _retryInitialize,
+            );
+          }
           return HomeScreen(
             state: widget.appController.state,
             bleOnboardingController: widget.bleOnboardingController,
@@ -52,112 +115,5 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
         },
       ),
     );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({
-    required this.state,
-    required this.bleOnboardingController,
-    super.key,
-  });
-
-  final AppState state;
-  final BleOnboardingController bleOnboardingController;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Автоматичний полив')),
-      body: Center(
-        child: switch (state.startupStatus) {
-          AppStartupStatus.initializing => const CircularProgressIndicator(),
-          AppStartupStatus.failed => _StatusPanel(
-              title: 'Помилка сховища',
-              subtitle: state.lastError?.toString() ?? 'Невідома помилка',
-            ),
-          AppStartupStatus.ready => _ReadyStatePanel(
-              state: state,
-              bleOnboardingController: bleOnboardingController,
-            ),
-        },
-      ),
-    );
-  }
-}
-
-class _ReadyStatePanel extends StatelessWidget {
-  const _ReadyStatePanel({
-    required this.state,
-    required this.bleOnboardingController,
-  });
-
-  final AppState state;
-  final BleOnboardingController bleOnboardingController;
-
-  @override
-  Widget build(BuildContext context) {
-    final hub = state.activeWateringHub;
-    if (_shouldShowOnboarding) {
-      return BleOnboardingScreen(
-        controller: bleOnboardingController,
-      );
-    }
-
-    final readyHub = hub!;
-    return _StatusPanel(
-      title: readyHub.displayName,
-      subtitle: 'Стан контролера: ${state.connectionState.label}',
-    );
-  }
-
-  bool get _shouldShowOnboarding {
-    final hub = state.activeWateringHub;
-    if (hub == null) {
-      return true;
-    }
-    return !hub.isOnboardingComplete || hub.apiAccessToken == null;
-  }
-}
-
-class _StatusPanel extends StatelessWidget {
-  const _StatusPanel({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(title, style: textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(subtitle, textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-}
-
-extension on WateringHubConnectionState {
-  String get label {
-    return switch (this) {
-      WateringHubConnectionState.noDevice => 'пристрій не додано',
-      WateringHubConnectionState.offline => 'офлайн',
-      WateringHubConnectionState.connecting => 'підключення',
-      WateringHubConnectionState.ipPending => 'очікування IP-адреси',
-      WateringHubConnectionState.checkingLocalHttps =>
-        'перевірка локального HTTPS',
-      WateringHubConnectionState.online => 'онлайн',
-      WateringHubConnectionState.httpsUnavailable => 'HTTPS недоступний',
-      WateringHubConnectionState.tokenInvalid => 'token недійсний',
-      WateringHubConnectionState.requiresBleRecovery =>
-        'потрібне відновлення через BLE',
-      WateringHubConnectionState.reconnectingBle => 'повторне BLE-підключення',
-    };
   }
 }

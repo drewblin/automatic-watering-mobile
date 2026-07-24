@@ -65,13 +65,15 @@ class WateringHub {
     DateTime? onboardingCompletedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool clearApiAccessToken = false,
   }) {
     return WateringHub(
       id: id ?? this.id,
       displayName: displayName ?? this.displayName,
       bleDeviceId: bleDeviceId ?? this.bleDeviceId,
       lastKnownIpAddress: lastKnownIpAddress ?? this.lastKnownIpAddress,
-      apiAccessToken: apiAccessToken ?? this.apiAccessToken,
+      apiAccessToken:
+          clearApiAccessToken ? null : apiAccessToken ?? this.apiAccessToken,
       serverDeviceId: serverDeviceId ?? this.serverDeviceId,
       onboardingCompletedAt:
           onboardingCompletedAt ?? this.onboardingCompletedAt,

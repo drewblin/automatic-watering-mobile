@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:automatic_watering_mobile/app/app_state.dart';
+import 'app_test_composition.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
@@ -17,15 +19,17 @@ import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage
 void main() {
   test('pairing saves BLE device id in active watering hub', () async {
     final storage = InMemoryWateringHubStorage();
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
     final device = const BleDiscoveredDevice(
       id: 'AA:BB:CC',
@@ -49,14 +53,16 @@ void main() {
 
   test('incorrect passkey sets an error and does not save a hub', () async {
     final storage = InMemoryWateringHubStorage();
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     controller.selectDevice(
@@ -93,14 +99,16 @@ void main() {
         createdAt: createdAt,
         updatedAt: createdAt,
       );
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
     const newDevice = BleDiscoveredDevice(
       id: 'NEW:DEVICE',
@@ -127,10 +135,12 @@ void main() {
 
   test('reading Wi-Fi settings keeps controller password out of state',
       () async {
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService(
       currentWifi: const WifiCredentials(
@@ -140,7 +150,7 @@ void main() {
     );
     final controller = BleOnboardingController(
       bleService: bleService,
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     controller.selectDevice(testDevice);
@@ -155,15 +165,17 @@ void main() {
   });
 
   test('Wi-Fi validation blocks invalid credentials without saving', () async {
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     controller.selectDevice(testDevice);
@@ -183,15 +195,17 @@ void main() {
   test('saving Wi-Fi settings schedules BLE reconnect and advances flow',
       () async {
     final storage = InMemoryWateringHubStorage();
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
-      appController: appController,
+      onboardingStorage: composition.onboarding,
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
     );
@@ -220,16 +234,20 @@ void main() {
   test('bootstrap saves IP and secure token then marks hub online', () async {
     final storage = InMemoryWateringHubStorage();
     final tokenStorage = InMemoryWateringHubTokenStorage();
-    final appController = AppController(
+    final localClient = FakeLocalControllerApiClient();
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
+      controllerSettingsRepository: ControllerSettingsRepository(
+        apiClient: localClient,
+      ),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService();
-    final localClient = FakeLocalControllerApiClient();
     final controller = BleOnboardingController(
       bleService: bleService,
-      appController: appController,
+      onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -266,10 +284,12 @@ void main() {
   test('bootstrap treats 0.0.0.0 as pending and does not call HTTPS', () async {
     final storage = InMemoryWateringHubStorage();
     final tokenStorage = InMemoryWateringHubTokenStorage();
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService(
       wifiIpAddress: const ControllerIpAddress('0.0.0.0'),
@@ -277,7 +297,7 @@ void main() {
     final localClient = FakeLocalControllerApiClient();
     final controller = BleOnboardingController(
       bleService: bleService,
-      appController: appController,
+      onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -304,14 +324,16 @@ void main() {
   });
 
   test('bootstrap maps HTTPS 401 to tokenInvalid state', () async {
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     await appController.initialize();
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(
         exception: const LocalControllerApiException(
           LocalControllerApiErrorKind.tokenInvalid,
@@ -397,6 +419,11 @@ const testDevice = BleDiscoveredDevice(
   isLikelyAutomaticWateringHub: true,
   advertisedServiceUuids: {AutomaticWateringBleConstants.serviceUuid},
 );
+
+ControllerSettingsRepository testSettingsRepository() {
+  return ControllerSettingsRepository(
+      apiClient: FakeLocalControllerApiClient());
+}
 
 class FakeBleService implements BleService {
   FakeBleService({
@@ -512,5 +539,55 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     if (exception != null) {
       throw exception;
     }
+  }
+
+  @override
+  Future<SettingsResponseData> getSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    await checkSettingsAccess(
+      ipAddress: ipAddress,
+      apiAccessToken: apiAccessToken,
+    );
+    return SettingsResponseData.fromJson({
+      'settings': {
+        'globalSettings': {
+          'idleWaterCounterReadIntervalSeconds': 60,
+          'wateringWaterCounterReadIntervalSeconds': 10,
+          'idlePressureSensorReadIntervalSeconds': 60,
+          'wateringPressureSensorReadIntervalSeconds': 10,
+          'idleSoilSensorReadIntervalSeconds': 300,
+          'wateringSoilSensorReadIntervalSeconds': 30,
+          'maximumManualValveOpenTimeSeconds': 600,
+          'startWateringBelowHumidityPercent': 35,
+          'stopWateringAboveHumidityPercent': 60,
+          'wateringStartMode': 'immediately',
+          'wateringWindowStartTime': null,
+          'wateringWindowEndTime': null,
+          'zoneWateringDurationSeconds': 120,
+          'zoneWateringRetryDelaySeconds': 300,
+        },
+        'remoteLogSettings': {
+          'url': 'https://api.example.test',
+          'token': 'log-token'
+        },
+        'valveSettings': [
+          {'pin': 17, 'name': 'Грядка 1', 'soilSensorSlaveAddress': 11},
+        ],
+        'pressureSensor': {'slaveAddress': 21, 'name': 'Тиск'},
+        'magistralWaterCounterSetting': {
+          'pin': 18,
+          'name': 'Магістраль',
+          'litersPerTick': 1.5,
+        },
+        'leafWaterCounterSettings': [],
+        'soilSensorSettings': [
+          {'slaveAddress': 11, 'name': 'Вологість 1'},
+        ],
+      },
+      'controllerCurrentTimestamp': 1717245600,
+      'controllerCurrentTime': '2024-06-01T12:00:00+0300',
+    });
   }
 }

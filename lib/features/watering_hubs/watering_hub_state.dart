@@ -1,3 +1,4 @@
+// todo провести ревью потрібних статусів
 enum WateringHubConnectionState {
   /// No active watering hub profile exists in local app storage.
   noDevice,

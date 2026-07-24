@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../../core/api_envelope.dart';
+import '../controller_settings/settings_response_data.dart';
 
 enum LocalControllerApiErrorKind {
   networkUnavailable,
@@ -27,6 +28,11 @@ class LocalControllerApiException implements Exception {
 
 abstract interface class LocalControllerApiClient {
   Future<void> checkSettingsAccess({
+    required String ipAddress,
+    required String apiAccessToken,
+  });
+
+  Future<SettingsResponseData> getSettings({
     required String ipAddress,
     required String apiAccessToken,
   });
@@ -55,6 +61,14 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     required String ipAddress,
     required String apiAccessToken,
   }) async {
+    await getSettings(ipAddress: ipAddress, apiAccessToken: apiAccessToken);
+  }
+
+  @override
+  Future<SettingsResponseData> getSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
     HttpClientRequest request;
     try {
       request = await _httpClient
@@ -65,7 +79,7 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
 
       final response = await request.close().timeout(_timeout);
-      await _handleResponse(response);
+      return await _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const LocalControllerApiException(
         LocalControllerApiErrorKind.networkUnavailable,
@@ -89,7 +103,9 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     }
   }
 
-  Future<void> _handleResponse(HttpClientResponse response) async {
+  Future<SettingsResponseData> _handleResponse(
+    HttpClientResponse response,
+  ) async {
     final statusCode = response.statusCode;
     if (statusCode == HttpStatus.unauthorized) {
       await response.drain<void>();
@@ -119,21 +135,19 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       if (decoded is! Map<String, Object?>) {
         throw const FormatException('Settings envelope must be an object');
       }
-      final envelope = ApiEnvelope<Map<String, Object?>>.fromJson(
+      final envelope = ApiEnvelope<SettingsResponseData>.fromJson(
         decoded,
         (data) {
           if (data is! Map<String, Object?>) {
             throw const FormatException('Settings data must be an object');
           }
-          return data;
+          return SettingsResponseData.fromJson(data);
         },
       );
       if (!envelope.success) {
         throw FormatException(envelope.error ?? 'Settings envelope failed');
       }
-      if (envelope.data['settings'] is! Map<String, Object?>) {
-        throw const FormatException('Settings object is missing');
-      }
+      return envelope.data;
     } on FormatException catch (error) {
       throw LocalControllerApiException(
         LocalControllerApiErrorKind.unexpectedResponse,

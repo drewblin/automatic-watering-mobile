@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:automatic_watering_mobile/app/app_state.dart';
+import 'app_test_composition.dart';
 import 'package:automatic_watering_mobile/app/automatic_watering_app.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
+import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
@@ -12,13 +15,15 @@ import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage
 void main() {
   testWidgets('shows BLE onboarding after startup without a device',
       (tester) async {
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     await tester.pumpWidget(
@@ -40,13 +45,17 @@ void main() {
     final createdAt = DateTime.utc(2026);
     final storage = InMemoryWateringHubStorage();
     final tokenStorage = InMemoryWateringHubTokenStorage();
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
+      controllerSettingsRepository: ControllerSettingsRepository(
+        apiClient: FakeSettingsApiClient(),
+      ),
     );
+    final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     await tester.pumpWidget(
@@ -69,7 +78,7 @@ void main() {
       createdAt: createdAt,
       updatedAt: createdAt,
     );
-    await appController.saveActiveWateringHub(incompleteHub);
+    await composition.onboarding.saveActiveWateringHub(incompleteHub);
     await tester.pump();
 
     expect(find.text('Додати контролер'), findsOneWidget);
@@ -79,11 +88,11 @@ void main() {
       lastKnownIpAddress: '192.168.1.42',
       updatedAt: DateTime.utc(2026, 1, 2),
     );
-    await appController.saveControllerAccess(
+    await composition.onboarding.saveControllerAccess(
       hub: completeHub,
       apiAccessToken: validToken,
     );
-    await appController.completeOnboarding();
+    await composition.onboarding.completeOnboarding();
     await tester.pump();
 
     expect(find.text('Додати контролер'), findsNothing);
@@ -108,13 +117,17 @@ void main() {
       );
     final tokenStorage = InMemoryWateringHubTokenStorage()
       ..tokens['hub-aa-bb-cc'] = validToken;
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
+      controllerSettingsRepository: ControllerSettingsRepository(
+        apiClient: FakeSettingsApiClient(),
+      ),
     );
+    final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     await tester.pumpWidget(
@@ -128,7 +141,61 @@ void main() {
 
     expect(find.text('Додати контролер'), findsNothing);
     expect(find.text('Automatic Watering Hub'), findsOneWidget);
-    expect(find.text('Стан контролера: офлайн'), findsOneWidget);
+    expect(find.text('Стан контролера: онлайн'), findsOneWidget);
+  });
+
+  testWidgets('retries startup settings load after fatal error',
+      (tester) async {
+    final createdAt = DateTime.utc(2026);
+    final storage = InMemoryWateringHubStorage()
+      ..activeHub = WateringHub(
+        id: 'hub-aa-bb-cc',
+        displayName: 'Automatic Watering Hub',
+        bleDeviceId: 'AA:BB:CC',
+        lastKnownIpAddress: '192.168.1.42',
+        apiAccessToken: null,
+        serverDeviceId: null,
+        onboardingCompletedAt: createdAt,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      );
+    final tokenStorage = InMemoryWateringHubTokenStorage()
+      ..tokens['hub-aa-bb-cc'] = validToken;
+    final client = FlakySettingsApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+      controllerSettingsRepository: ControllerSettingsRepository(
+        apiClient: client,
+      ),
+    );
+    final appController = composition.appController;
+    final bleOnboardingController = BleOnboardingController(
+      bleService: FakeBleService(),
+      onboardingStorage: composition.onboarding,
+    );
+
+    await tester.pumpWidget(
+      AutomaticWateringApp(
+        appController: appController,
+        bleOnboardingController: bleOnboardingController,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNotNull);
+    expect(find.text('Помилка запуску'), findsOneWidget);
+    expect(find.text('Повторити'), findsOneWidget);
+    expect(find.text('Налаштування контролера'), findsNothing);
+
+    await tester.tap(find.text('Повторити'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Помилка запуску'), findsNothing);
+    expect(find.text('Automatic Watering Hub'), findsOneWidget);
+    expect(find.text('Налаштування контролера'), findsOneWidget);
   });
 
   testWidgets('starts onboarding when saved controller access is incomplete',
@@ -146,13 +213,15 @@ void main() {
         createdAt: createdAt,
         updatedAt: createdAt,
       );
-    final appController = AppController(
+    final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
     );
+    final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
-      appController: appController,
+      onboardingStorage: composition.onboarding,
     );
 
     await tester.pumpWidget(
@@ -170,6 +239,88 @@ void main() {
 
 const validToken =
     '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+ControllerSettingsRepository testSettingsRepository() {
+  return ControllerSettingsRepository(apiClient: FakeSettingsApiClient());
+}
+
+const settingsResponseDataJson = {
+  'settings': {
+    'globalSettings': {
+      'idleWaterCounterReadIntervalSeconds': 60,
+      'wateringWaterCounterReadIntervalSeconds': 10,
+      'idlePressureSensorReadIntervalSeconds': 60,
+      'wateringPressureSensorReadIntervalSeconds': 10,
+      'idleSoilSensorReadIntervalSeconds': 300,
+      'wateringSoilSensorReadIntervalSeconds': 30,
+      'maximumManualValveOpenTimeSeconds': 600,
+      'startWateringBelowHumidityPercent': 35,
+      'stopWateringAboveHumidityPercent': 60,
+      'wateringStartMode': 'immediately',
+      'wateringWindowStartTime': null,
+      'wateringWindowEndTime': null,
+      'zoneWateringDurationSeconds': 120,
+      'zoneWateringRetryDelaySeconds': 300,
+    },
+    'remoteLogSettings': {
+      'url': 'https://api.example.test',
+      'token': 'log-token'
+    },
+    'valveSettings': [
+      {'pin': 17, 'name': 'Грядка 1', 'soilSensorSlaveAddress': 11},
+    ],
+    'pressureSensor': {'slaveAddress': 21, 'name': 'Тиск'},
+    'magistralWaterCounterSetting': {
+      'pin': 18,
+      'name': 'Магістраль',
+      'litersPerTick': 1.5,
+    },
+    'leafWaterCounterSettings': [],
+    'soilSensorSettings': [
+      {'slaveAddress': 11, 'name': 'Вологість 1'},
+    ],
+  },
+  'controllerCurrentTimestamp': 1717245600,
+  'controllerCurrentTime': '2024-06-01T12:00:00+0300',
+};
+
+class FakeSettingsApiClient implements LocalControllerApiClient {
+  @override
+  Future<void> checkSettingsAccess({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {}
+
+  @override
+  Future<SettingsResponseData> getSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    return SettingsResponseData.fromJson(settingsResponseDataJson);
+  }
+}
+
+class FlakySettingsApiClient extends FakeSettingsApiClient {
+  var _calls = 0;
+
+  @override
+  Future<SettingsResponseData> getSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    _calls += 1;
+    if (_calls == 1) {
+      throw const LocalControllerApiException(
+        LocalControllerApiErrorKind.networkUnavailable,
+        'Controller network is unavailable',
+      );
+    }
+    return super.getSettings(
+      ipAddress: ipAddress,
+      apiAccessToken: apiAccessToken,
+    );
+  }
+}
 
 class FakeBleService implements BleService {
   @override
