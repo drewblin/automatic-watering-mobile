@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_test_composition.dart';
+import 'package:automatic_watering_mobile/app/app_state.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
@@ -13,7 +14,6 @@ import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_con
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
-import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub_state.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 void main() {
@@ -225,13 +225,10 @@ void main() {
     expect(bleService.reconnectCalls, 1);
     expect(controller.state, isA<AccessSetupReady>());
     expect(controller.state.wifiCredentials.password, isEmpty);
-    expect(
-      appController.state.connectionState,
-      WateringHubConnectionState.reconnectingBle,
-    );
   });
 
-  test('bootstrap saves IP and secure token then marks hub online', () async {
+  test('bootstrap saves IP and secure token then completes onboarding',
+      () async {
     final storage = InMemoryWateringHubStorage();
     final tokenStorage = InMemoryWateringHubTokenStorage();
     final localClient = FakeLocalControllerApiClient();
@@ -270,15 +267,17 @@ void main() {
     expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
     expect(localClient.checkedIpAddress, '192.168.1.42');
     expect(localClient.checkedToken, validToken);
-    expect(
-      appController.state.connectionState,
-      WateringHubConnectionState.online,
-    );
+    expect(appController.state.startupStatus, AppStartupStatus.onboarding);
     expect(appController.state.activeWateringHub?.apiAccessToken, validToken);
     expect(
       appController.state.activeWateringHub?.onboardingCompletedAt,
       isNotNull,
     );
+
+    await appController.initialize();
+
+    expect(appController.state.startupStatus, AppStartupStatus.ready);
+    expect(appController.state.settings?.syncedAt, isNotNull);
   });
 
   test('bootstrap treats 0.0.0.0 as pending and does not call HTTPS', () async {
@@ -317,10 +316,6 @@ void main() {
     expect(storage.activeHub?.lastKnownIpAddress, '0.0.0.0');
     expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
     expect(localClient.checkCalls, 0);
-    expect(
-      appController.state.connectionState,
-      WateringHubConnectionState.ipPending,
-    );
   });
 
   test('bootstrap maps HTTPS 401 to tokenInvalid state', () async {
@@ -358,10 +353,6 @@ void main() {
     expect(
       controller.state.controllerAccessError?.kind,
       ControllerAccessFailureKind.tokenInvalid,
-    );
-    expect(
-      appController.state.connectionState,
-      WateringHubConnectionState.tokenInvalid,
     );
   });
 

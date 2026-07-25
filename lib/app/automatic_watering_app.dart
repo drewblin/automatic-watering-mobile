@@ -80,6 +80,10 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
     await _initialize();
   }
 
+  void _restartOnboarding() {
+    // todo реалізувати повторний onboarding для вже доданого контролера.
+  }
+
   void _handleExternalFatalError() {
     final error = widget.fatalErrorListenable?.value;
     if (error == null || !mounted) {
@@ -106,10 +110,12 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
             return FatalErrorScreen(
               error: fatalError,
               onRetry: _retryInitialize,
+              onRestartOnboarding: _restartOnboarding,
             );
           }
           return HomeScreen(
             state: widget.appController.state,
+            onOnboardingComplete: _initialize,
             bleOnboardingController: widget.bleOnboardingController,
           );
         },

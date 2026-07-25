@@ -92,12 +92,13 @@ void main() {
       hub: completeHub,
       apiAccessToken: validToken,
     );
-    await composition.onboarding.completeOnboarding();
+    await composition.onboarding.completeOnboarding(completeHub);
+    await appController.initialize();
     await tester.pump();
 
     expect(find.text('Додати контролер'), findsNothing);
     expect(find.text('Automatic Watering Hub'), findsOneWidget);
-    expect(find.text('Стан контролера: онлайн'), findsOneWidget);
+    expect(find.text('Контролер доступний'), findsOneWidget);
   });
 
   testWidgets('starts on main screen when saved controller access exists',
@@ -141,7 +142,7 @@ void main() {
 
     expect(find.text('Додати контролер'), findsNothing);
     expect(find.text('Automatic Watering Hub'), findsOneWidget);
-    expect(find.text('Стан контролера: онлайн'), findsOneWidget);
+    expect(find.text('Контролер доступний'), findsOneWidget);
   });
 
   testWidgets('retries startup settings load after fatal error',
@@ -187,6 +188,7 @@ void main() {
     expect(tester.takeException(), isNotNull);
     expect(find.text('Помилка запуску'), findsOneWidget);
     expect(find.text('Повторити'), findsOneWidget);
+    expect(find.text('Повторити onboarding'), findsOneWidget);
     expect(find.text('Налаштування контролера'), findsNothing);
 
     await tester.tap(find.text('Повторити'));

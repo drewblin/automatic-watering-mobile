@@ -54,7 +54,6 @@ Future<void> main() async {
         stateStore: stateStore,
         wateringHubStorage: wateringHubStorage,
         tokenStorage: tokenStorage,
-        startupService: startupService,
       );
       final appController = AppController(
         stateStore: stateStore,

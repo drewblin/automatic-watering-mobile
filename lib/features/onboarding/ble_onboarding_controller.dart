@@ -9,7 +9,6 @@ import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
 import '../../features/watering_hubs/watering_hub.dart';
-import '../../features/watering_hubs/watering_hub_state.dart';
 import 'ble_onboarding_state.dart';
 import 'wifi_provisioning_models.dart';
 
@@ -62,6 +61,7 @@ class BleOnboardingController extends ChangeNotifier {
   final int _maxReconnectAttempts;
   StreamSubscription<List<BleDiscoveredDevice>>? _devicesSubscription;
   List<BleDiscoveredDevice> _devices = const [];
+  WateringHub? _activeWateringHub;
   bool _isBleConnected = false;
   bool _isDisposed = false;
   int _availabilityRequestId = 0;
@@ -323,9 +323,6 @@ class BleOnboardingController extends ChangeNotifier {
           credentials: publicCredentials,
         ),
       );
-      _onboardingStorage.setConnectionState(
-        WateringHubConnectionState.reconnectingBle,
-      );
 
       await Future<void>.delayed(_rebootDelay);
       await _bleService.disconnect(device.id);
@@ -382,9 +379,6 @@ class BleOnboardingController extends ChangeNotifier {
 
     try {
       if (!_isBleConnected) {
-        _onboardingStorage.setConnectionState(
-          WateringHubConnectionState.reconnectingBle,
-        );
         await _bleService.reconnect(device);
         await _bleService.pairAndDiscoverServices(
           device: device,
@@ -403,24 +397,22 @@ class BleOnboardingController extends ChangeNotifier {
       );
       final token = await _bleService.readApiAccessToken(device.id);
 
-      final activeHub = _onboardingStorage.activeWateringHub;
+      final activeHub = _activeWateringHub;
       if (activeHub == null || activeHub.bleDeviceId != device.id) {
         await _savePairedHub(device);
       }
-      final hub = (_onboardingStorage.activeWateringHub ??
+      final hub = (_activeWateringHub ??
               _newHubForDevice(device, DateTime.now().toUtc()))
           .copyWith(
         lastKnownIpAddress: ipAddress.value,
         updatedAt: DateTime.now().toUtc(),
       );
-      await _onboardingStorage.saveControllerAccess(
+      _activeWateringHub = await _onboardingStorage.saveControllerAccess(
         hub: hub,
         apiAccessToken: token.value,
       );
 
       if (ipAddress.isPending) {
-        _onboardingStorage
-            .setConnectionState(WateringHubConnectionState.ipPending);
         _setState(
           ControllerIpPending(
             device: device,
@@ -436,9 +428,6 @@ class BleOnboardingController extends ChangeNotifier {
         return;
       }
 
-      _onboardingStorage.setConnectionState(
-        WateringHubConnectionState.checkingLocalHttps,
-      );
       _setState(
         CheckingLocalHttpsAccess(
           device: device,
@@ -452,7 +441,7 @@ class BleOnboardingController extends ChangeNotifier {
         apiAccessToken: token.value,
       );
 
-      await _onboardingStorage.completeOnboarding();
+      await _onboardingStorage.completeOnboarding(_activeWateringHub ?? hub);
       _setState(
         ControllerAccessReady(
           device: device,
@@ -466,9 +455,6 @@ class BleOnboardingController extends ChangeNotifier {
       _handleLocalControllerError(device, credentials, error);
     } catch (error) {
       _isBleConnected = false;
-      _onboardingStorage.setConnectionState(
-        WateringHubConnectionState.requiresBleRecovery,
-      );
       _setState(
         ControllerAccessFailed(
           device: device,
@@ -565,7 +551,7 @@ class BleOnboardingController extends ChangeNotifier {
 
   Future<void> _savePairedHub(BleDiscoveredDevice device) async {
     final now = DateTime.now().toUtc();
-    final activeHub = _onboardingStorage.activeWateringHub;
+    final activeHub = _activeWateringHub;
     final hub = activeHub?.bleDeviceId == device.id
         ? activeHub!.copyWith(
             displayName: device.displayName,
@@ -583,6 +569,7 @@ class BleOnboardingController extends ChangeNotifier {
             updatedAt: now,
           );
     await _onboardingStorage.saveActiveWateringHub(hub);
+    _activeWateringHub = hub;
   }
 
   WateringHub _newHubForDevice(BleDiscoveredDevice device, DateTime now) {
@@ -616,17 +603,6 @@ class BleOnboardingController extends ChangeNotifier {
       LocalControllerApiErrorKind.unexpectedResponse =>
         ControllerAccessFailureKind.unexpectedResponse,
     };
-    final connectionState = switch (error.kind) {
-      LocalControllerApiErrorKind.tokenInvalid =>
-        WateringHubConnectionState.tokenInvalid,
-      LocalControllerApiErrorKind.networkUnavailable ||
-      LocalControllerApiErrorKind.tlsCertificate ||
-      LocalControllerApiErrorKind.controllerUnavailable =>
-        WateringHubConnectionState.httpsUnavailable,
-      LocalControllerApiErrorKind.unexpectedResponse =>
-        WateringHubConnectionState.httpsUnavailable,
-    };
-    _onboardingStorage.setConnectionState(connectionState);
     _setState(
       ControllerAccessFailed(
         device: device,

@@ -9,10 +9,12 @@ import 'wifi_provisioning_models.dart';
 class BleOnboardingScreen extends StatefulWidget {
   const BleOnboardingScreen({
     required this.controller,
+    required this.onCompleted,
     super.key,
   });
 
   final BleOnboardingController controller;
+  final Future<void> Function() onCompleted;
 
   @override
   State<BleOnboardingScreen> createState() => _BleOnboardingScreenState();
@@ -26,6 +28,7 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
   final _passwordController = TextEditingController();
   String? _lastSyncedSsid;
   Type? _lastStateType;
+  bool _completionRequested = false;
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
       builder: (context, _) {
         final state = widget.controller.state;
         _syncWifiFields(state);
+        _requestCompletionIfReady(state);
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -149,6 +153,23 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
       _passwordController.clear();
     }
     _lastStateType = stateType;
+  }
+
+  void _requestCompletionIfReady(BleOnboardingState state) {
+    if (state is! ControllerAccessReady) {
+      _completionRequested = false;
+      return;
+    }
+    if (_completionRequested) {
+      return;
+    }
+    _completionRequested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+      await widget.onCompleted();
+    });
   }
 }
 

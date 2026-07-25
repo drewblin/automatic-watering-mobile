@@ -1,10 +1,8 @@
 import '../features/controller_settings/controller_settings_repository.dart';
 import '../features/controller_settings/device_objects.dart';
 import '../features/controller_settings/settings_response_data.dart';
-import '../features/local_controller/local_controller_api_client.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';
-import '../features/watering_hubs/watering_hub_state.dart';
 import '../storage/watering_hub_storage.dart';
 import 'app_state.dart';
 import 'app_state_store.dart';
@@ -27,23 +25,13 @@ class AppStartupService {
   final ControllerSettingsRepository _controllerSettingsRepository;
 
   Future<void> initialize() async {
-    final currentHub = _stateStore.state.activeWateringHub;
-    _stateStore.setState(
-      AppState.loading(
-        activeWateringHub: currentHub,
-        connectionState: currentHub == null
-            ? WateringHubConnectionState.noDevice
-        // todo такого кейсу не має бути
-            : WateringHubConnectionState.checkingLocalHttps,
-      ),
-    );
+    _stateStore.setState(AppState.loading());
 
     final hubWithoutToken = await _wateringHubStorage.readActiveWateringHub();
     if (hubWithoutToken == null) {
       _stateStore.setState(
         AppState.readyForOnboarding(
           activeWateringHub: null,
-          connectionState: WateringHubConnectionState.noDevice,
         ),
       );
       return;
@@ -55,7 +43,6 @@ class AppStartupService {
       _stateStore.setState(
         AppState.readyForOnboarding(
           activeWateringHub: hub,
-          connectionState: WateringHubConnectionState.offline,
         ),
       );
       return;
@@ -72,13 +59,6 @@ class AppStartupService {
     required WateringHub hub,
     required PlanSchema? activePlanSchema,
   }) async {
-    _stateStore.setState(
-      AppState.loading(
-        activeWateringHub: hub,
-        connectionState: WateringHubConnectionState.checkingLocalHttps,
-      ),
-    );
-
     final settings = await _loadSettings(hub);
     _stateStore.setState(
       AppState.readyWithHub(
@@ -97,34 +77,10 @@ class AppStartupService {
     try {
       return await _controllerSettingsRepository.syncSettings(hub);
     } catch (error) {
-      _stateStore.setState(
-        _stateStore.state.copyWith(
-          connectionState: _connectionStateForSettingsLoadError(error),
-        ),
-      );
       throw FatalAppException(
         'Не вдалося завантажити налаштування контролера',
         error,
       );
     }
-  }
-
-  WateringHubConnectionState _connectionStateForSettingsLoadError(
-    Object error,
-  ) {
-    if (error is LocalControllerApiException) {
-      return switch (error.kind) {
-        LocalControllerApiErrorKind.tokenInvalid =>
-          WateringHubConnectionState.tokenInvalid,
-        LocalControllerApiErrorKind.controllerUnavailable ||
-        LocalControllerApiErrorKind.networkUnavailable =>
-          WateringHubConnectionState.offline,
-        LocalControllerApiErrorKind.tlsCertificate =>
-          WateringHubConnectionState.httpsUnavailable,
-        LocalControllerApiErrorKind.unexpectedResponse =>
-          WateringHubConnectionState.httpsUnavailable,
-      };
-    }
-    return WateringHubConnectionState.httpsUnavailable;
   }
 }

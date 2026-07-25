@@ -3,7 +3,6 @@ import '../features/controller_settings/device_objects.dart';
 import '../features/controller_settings/settings_response_data.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';
-import '../features/watering_hubs/watering_hub_state.dart';
 
 enum AppStartupStatus {
   initializing,
@@ -16,20 +15,15 @@ class AppState {
     required this.startupStatus,
     required this.activeWateringHub,
     required this.activePlanSchema,
-    required this.connectionState,
     required this.settings,
     required this.deviceObjects,
   });
 
-  factory AppState.loading({
-    required WateringHub? activeWateringHub,
-    required WateringHubConnectionState connectionState,
-  }) {
+  factory AppState.loading() {
     return AppState(
       startupStatus: AppStartupStatus.initializing,
-      activeWateringHub: activeWateringHub,
+      activeWateringHub: null,
       activePlanSchema: null,
-      connectionState: connectionState,
       settings: null,
       deviceObjects: const [],
     );
@@ -37,13 +31,11 @@ class AppState {
 
   factory AppState.readyForOnboarding({
     required WateringHub? activeWateringHub,
-    required WateringHubConnectionState connectionState,
   }) {
     return AppState(
       startupStatus: AppStartupStatus.onboarding,
       activeWateringHub: activeWateringHub,
       activePlanSchema: null,
-      connectionState: connectionState,
       settings: null,
       deviceObjects: const [],
     );
@@ -59,7 +51,6 @@ class AppState {
       startupStatus: AppStartupStatus.ready,
       activeWateringHub: activeWateringHub,
       activePlanSchema: activePlanSchema,
-      connectionState: WateringHubConnectionState.online,
       settings: settings,
       deviceObjects: deviceObjects,
     );
@@ -68,7 +59,6 @@ class AppState {
   final AppStartupStatus startupStatus;
   final WateringHub? activeWateringHub;
   final PlanSchema? activePlanSchema;
-  final WateringHubConnectionState connectionState;
   final SettingsResponseData? settings;
   final List<DeviceObject> deviceObjects;
 
@@ -94,7 +84,6 @@ class AppState {
     AppStartupStatus? startupStatus,
     WateringHub? activeWateringHub,
     PlanSchema? activePlanSchema,
-    WateringHubConnectionState? connectionState,
     SettingsResponseData? settings,
     List<DeviceObject>? deviceObjects,
     bool clearWateringHub = false,
@@ -107,7 +96,6 @@ class AppState {
           clearWateringHub ? null : activeWateringHub ?? this.activeWateringHub,
       activePlanSchema:
           clearPlanSchema ? null : activePlanSchema ?? this.activePlanSchema,
-      connectionState: connectionState ?? this.connectionState,
       settings: clearSettings ? null : settings ?? this.settings,
       deviceObjects:
           clearSettings ? const [] : deviceObjects ?? this.deviceObjects,

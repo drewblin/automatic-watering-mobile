@@ -5,7 +5,6 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
-import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub_state.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 void main() {
@@ -19,8 +18,7 @@ void main() {
     expect(data.syncedAt, isNotNull);
   });
 
-  test('app controller loads settings during startup and marks hub online',
-      () async {
+  test('app controller loads settings during startup', () async {
     final createdAt = DateTime.utc(2026);
     final storage = InMemoryWateringHubStorage()
       ..activeHub = WateringHub(
@@ -51,8 +49,6 @@ void main() {
     expect(client.ipAddress, '192.168.1.42');
     expect(client.apiAccessToken, 'token');
     expect(appController.state.settings?.syncedAt, isNotNull);
-    expect(
-        appController.state.connectionState, WateringHubConnectionState.online);
     expect(appController.state.deviceObjects.map((object) => object.id), [
       'hub-aa-bb-cc:valve:17',
       'hub-aa-bb-cc:soil_sensor:11',

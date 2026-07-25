@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../watering_hubs/watering_hub_connection_state_label.dart';
-import '../watering_hubs/watering_hub_state.dart';
 import 'controller_settings.dart';
 import 'device_objects.dart';
 import 'settings_response_data.dart';
@@ -10,13 +8,11 @@ class ControllerSettingsScreen extends StatefulWidget {
   const ControllerSettingsScreen({
     required this.settings,
     required this.deviceObjects,
-    required this.connectionState,
     super.key,
   });
 
   final SettingsResponseData settings;
   final List<DeviceObject> deviceObjects;
-  final WateringHubConnectionState connectionState;
 
   @override
   State<ControllerSettingsScreen> createState() =>
@@ -75,7 +71,6 @@ class _ControllerSettingsScreenState extends State<ControllerSettingsScreen> {
         children: [
           _SettingsSummary(
             settings: widget.settings,
-            connectionState: widget.connectionState,
           ),
           const SizedBox(height: 16),
           _GlobalSettingsEditor(
@@ -96,11 +91,9 @@ class _ControllerSettingsScreenState extends State<ControllerSettingsScreen> {
 class _SettingsSummary extends StatelessWidget {
   const _SettingsSummary({
     required this.settings,
-    required this.connectionState,
   });
 
   final SettingsResponseData settings;
-  final WateringHubConnectionState connectionState;
 
   @override
   Widget build(BuildContext context) {
@@ -114,8 +107,6 @@ class _SettingsSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Статус HTTPS: ${connectionState.label}'),
-        const SizedBox(height: 8),
         Text(
           'Налаштування завантажені: ${_formatSyncedAt(settings.syncedAt)}',
         ),

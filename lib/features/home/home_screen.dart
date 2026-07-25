@@ -5,16 +5,17 @@ import '../../app/status_panel.dart';
 import '../controller_settings/controller_settings_screen.dart';
 import '../onboarding/ble_onboarding_controller.dart';
 import '../onboarding/ble_onboarding_screen.dart';
-import '../watering_hubs/watering_hub_connection_state_label.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     required this.state,
+    required this.onOnboardingComplete,
     required this.bleOnboardingController,
     super.key,
   });
 
   final AppState state;
+  final Future<void> Function() onOnboardingComplete;
   final BleOnboardingController bleOnboardingController;
 
   @override
@@ -26,6 +27,7 @@ class HomeScreen extends StatelessWidget {
           AppStartupStatus.initializing => const CircularProgressIndicator(),
           AppStartupStatus.onboarding => BleOnboardingScreen(
               controller: bleOnboardingController,
+              onCompleted: onOnboardingComplete,
             ),
           AppStartupStatus.ready => _ReadyStatePanel(
               state: state,
@@ -53,7 +55,7 @@ class _ReadyStatePanel extends StatelessWidget {
         children: [
           StatusPanel(
             title: hub.displayName,
-            subtitle: 'Стан контролера: ${state.connectionState.label}',
+            subtitle: 'Контролер доступний',
           ),
           const SizedBox(height: 16),
           _ReadyHubActions(state: state),
@@ -85,7 +87,6 @@ class _ReadyHubActions extends StatelessWidget {
                 builder: (_) => ControllerSettingsScreen(
                   settings: settings,
                   deviceObjects: state.deviceObjects,
-                  connectionState: state.connectionState,
                 ),
               ),
             );

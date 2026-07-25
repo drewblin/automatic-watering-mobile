@@ -6,11 +6,13 @@ class FatalErrorScreen extends StatelessWidget {
   const FatalErrorScreen({
     required this.error,
     required this.onRetry,
+    required this.onRestartOnboarding,
     super.key,
   });
 
   final Object error;
   final VoidCallback onRetry;
+  final VoidCallback onRestartOnboarding;
 
   @override
   Widget build(BuildContext context) {
@@ -20,10 +22,22 @@ class FatalErrorScreen extends StatelessWidget {
         child: StatusPanel(
           title: 'Помилка запуску',
           subtitle: error.toString(),
-          action: FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Повторити'),
+          action: Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Повторити'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onRestartOnboarding,
+                icon: const Icon(Icons.settings_backup_restore),
+                label: const Text('Повторити onboarding'),
+              ),
+            ],
           ),
         ),
       ),

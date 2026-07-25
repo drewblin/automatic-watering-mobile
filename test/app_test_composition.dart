@@ -23,7 +23,6 @@ class TestAppComposition {
       stateStore: stateStore,
       wateringHubStorage: this.wateringHubStorage,
       tokenStorage: this.tokenStorage,
-      startupService: startup,
     );
     appController = AppController(
       stateStore: stateStore,
