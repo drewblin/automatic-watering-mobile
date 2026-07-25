@@ -24,6 +24,7 @@ void main() {
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
     );
 
     await tester.pumpWidget(
@@ -56,6 +57,7 @@ void main() {
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
     );
 
     await tester.pumpWidget(
@@ -129,6 +131,7 @@ void main() {
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
     );
 
     await tester.pumpWidget(
@@ -174,6 +177,7 @@ void main() {
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
     );
 
     await tester.pumpWidget(
@@ -224,6 +228,7 @@ void main() {
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
     );
 
     await tester.pumpWidget(

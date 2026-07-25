@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_test_composition.dart';
@@ -17,7 +15,7 @@ import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.da
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 void main() {
-  test('pairing saves BLE device id in active watering hub', () async {
+  test('pairing reads Wi-Fi settings without saving a watering hub', () async {
     final storage = InMemoryWateringHubStorage();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
@@ -30,6 +28,7 @@ void main() {
     final controller = BleOnboardingController(
       bleService: bleService,
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final device = const BleDiscoveredDevice(
       id: 'AA:BB:CC',
@@ -46,9 +45,7 @@ void main() {
     );
 
     expect(controller.state, isA<WifiCredentialsFormReady>());
-    expect(storage.activeHub?.bleDeviceId, 'AA:BB:CC');
-    expect(storage.activeHub?.displayName,
-        AutomaticWateringBleConstants.deviceName);
+    expect(storage.activeHub, isNull);
   });
 
   test('incorrect passkey sets an error and does not save a hub', () async {
@@ -63,6 +60,7 @@ void main() {
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
 
     controller.selectDevice(
@@ -85,7 +83,8 @@ void main() {
     expect(storage.activeHub, isNull);
   });
 
-  test('pairing a different BLE device creates a new active hub', () async {
+  test('bootstrap creates a new active hub for a different BLE device',
+      () async {
     final createdAt = DateTime.utc(2026);
     final storage = InMemoryWateringHubStorage()
       ..activeHub = WateringHub(
@@ -109,6 +108,9 @@ void main() {
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
     );
     const newDevice = BleDiscoveredDevice(
       id: 'NEW:DEVICE',
@@ -123,13 +125,18 @@ void main() {
     await controller.pairSelectedDevice(
       AutomaticWateringBleConstants.pairingPasskey,
     );
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
 
     expect(storage.activeHub?.id, 'hub-new-device');
     expect(storage.activeHub?.displayName, 'Automatic Watering Hub');
     expect(storage.activeHub?.bleDeviceId, 'NEW:DEVICE');
-    expect(storage.activeHub?.lastKnownIpAddress, isNull);
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
     expect(storage.activeHub?.apiAccessToken, isNull);
     expect(storage.activeHub?.serverDeviceId, isNull);
+    expect(storage.activeHub?.onboardingCompletedAt, isNotNull);
     expect(storage.activeHub?.createdAt, isNot(createdAt));
   });
 
@@ -151,6 +158,7 @@ void main() {
     final controller = BleOnboardingController(
       bleService: bleService,
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
 
     controller.selectDevice(testDevice);
@@ -176,6 +184,7 @@ void main() {
     final controller = BleOnboardingController(
       bleService: bleService,
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
 
     controller.selectDevice(testDevice);
@@ -206,6 +215,7 @@ void main() {
     final controller = BleOnboardingController(
       bleService: bleService,
       onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
     );
@@ -313,8 +323,9 @@ void main() {
     await controller.bootstrapControllerAccess();
 
     expect(controller.state, isA<ControllerIpPending>());
-    expect(storage.activeHub?.lastKnownIpAddress, '0.0.0.0');
-    expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
+    expect(storage.activeHub, isNull);
+    expect(tokenStorage.tokens, isEmpty);
+    expect(bleService.readApiAccessTokenCalls, 0);
     expect(localClient.checkCalls, 0);
   });
 
@@ -429,6 +440,7 @@ class FakeBleService implements BleService {
   WifiCredentials? savedWifiCredentials;
   int disconnectCalls = 0;
   int reconnectCalls = 0;
+  int readApiAccessTokenCalls = 0;
 
   @override
   Stream<List<BleDiscoveredDevice>> get discoveredDevices =>
@@ -484,6 +496,7 @@ class FakeBleService implements BleService {
 
   @override
   Future<ControllerApiAccessToken> readApiAccessToken(String deviceId) async {
+    readApiAccessTokenCalls += 1;
     return apiAccessToken;
   }
 
