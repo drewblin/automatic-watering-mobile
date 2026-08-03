@@ -12,6 +12,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/settings_
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
+import 'package:automatic_watering_mobile/features/onboarding/phone_wifi_service.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
@@ -29,6 +30,7 @@ void main() {
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
     );
@@ -60,6 +62,7 @@ void main() {
       bleService: FakeBleService(
         hasAutomaticWateringService: false,
       ),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
     );
@@ -107,6 +110,7 @@ void main() {
     await appController.initialize();
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
       rebootDelay: Duration.zero,
@@ -154,6 +158,7 @@ void main() {
     );
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
     );
@@ -164,6 +169,43 @@ void main() {
     expect(controller.state.wifiCredentials.ssid, 'Greenhouse');
     expect(controller.state.wifiCredentials.password, isEmpty);
     expect(controller.state, isA<WifiCredentialsFormReady>());
+  });
+
+  test('phone Wi-Fi snapshot fills current SSID and visible networks',
+      () async {
+    final composition = TestAppComposition(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final controller = BleOnboardingController(
+      bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(
+        snapshot: const PhoneWifiSnapshot(
+          currentSsid: 'Garden',
+          networks: [
+            PhoneWifiNetwork(ssid: 'Garden', signalLevel: -42),
+            PhoneWifiNetwork(ssid: 'Greenhouse', signalLevel: -60),
+          ],
+        ),
+      ),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.useCurrentPhoneWifi();
+
+    expect(controller.state, isA<WifiCredentialsFormReady>());
+    expect(controller.state.wifiCredentials.ssid, 'Garden');
+    final formState = controller.state as WifiCredentialsFormReady;
+    expect(
+      formState.phoneWifiNetworks.map((network) => network.ssid),
+      ['Garden', 'Greenhouse'],
+    );
   });
 
   test('reading Wi-Fi settings times out and returns to the form', () async {
@@ -177,6 +219,7 @@ void main() {
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
       readCurrentWifiSettingsTimeout: const Duration(milliseconds: 1),
@@ -210,6 +253,7 @@ void main() {
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
     );
@@ -238,6 +282,7 @@ void main() {
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
       rebootDelay: Duration.zero,
@@ -258,6 +303,110 @@ void main() {
     expect(controller.state.wifiCredentials.password, isEmpty);
   });
 
+  test('skipping Wi-Fi settings keeps controller settings unchanged', () async {
+    final composition = TestAppComposition(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final bleService = FakeBleService(
+      currentWifi: const WifiCredentials(
+        ssid: 'ExistingNetwork',
+        password: 'controller-secret',
+      ),
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    controller.skipWifiSettings();
+
+    expect(controller.state, isA<AccessSetupReady>());
+    expect(controller.state.wifiCredentials.ssid, 'ExistingNetwork');
+    expect(controller.state.wifiCredentials.password, isEmpty);
+    expect(bleService.savedWifiCredentials, isNull);
+  });
+
+  test('accepted Wi-Fi save maps failed reboot reconnect to reconnect state',
+      () async {
+    final composition = TestAppComposition(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final bleService = FakeBleService(failReconnect: true);
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+      maxReconnectAttempts: 1,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+
+    expect(bleService.savedWifiCredentials?.ssid, 'Garden');
+    expect(controller.state, isA<ReconnectAfterRebootBlocked>());
+    expect(
+      controller.state.wifiError?.operation,
+      WifiProvisioningOperation.reconnectBle,
+    );
+    expect(
+      controller.state.wifiError?.message,
+      'Не вдалося повторно підключитися до контролера через BLE.',
+    );
+  });
+
+  test('rejected Wi-Fi save returns to form with save error', () async {
+    final composition = TestAppComposition(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final bleService = FakeBleService(restartScheduled: false);
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+
+    expect(controller.state, isA<WifiCredentialsFormReady>());
+    expect(
+      controller.state.wifiError?.operation,
+      WifiProvisioningOperation.saveSettings,
+    );
+    expect(
+      controller.state.wifiError?.message,
+      'Контролер не прийняв Wi-Fi налаштування.',
+    );
+  });
+
   test('bootstrap saves IP and secure token then completes onboarding',
       () async {
     final storage = InMemoryWateringHubStorage();
@@ -275,6 +424,7 @@ void main() {
     final bleService = FakeBleService();
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
       rebootDelay: Duration.zero,
@@ -324,6 +474,7 @@ void main() {
     final localClient = FakeLocalControllerApiClient();
     final controller = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
       rebootDelay: Duration.zero,
@@ -354,6 +505,7 @@ void main() {
     await appController.initialize();
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(
         exception: const LocalControllerApiException(
@@ -445,12 +597,16 @@ class FakeBleService implements BleService {
     this.wifiIpAddress = const ControllerIpAddress('192.168.1.42'),
     this.apiAccessToken = const ControllerApiAccessToken(validToken),
     this.hasAutomaticWateringService = true,
+    this.restartScheduled = true,
+    this.failReconnect = false,
   });
 
   final WifiCredentials currentWifi;
   final ControllerIpAddress wifiIpAddress;
   final ControllerApiAccessToken apiAccessToken;
   final bool hasAutomaticWateringService;
+  final bool restartScheduled;
+  final bool failReconnect;
   WifiCredentials? savedWifiCredentials;
   int disconnectCalls = 0;
   int reconnectCalls = 0;
@@ -479,6 +635,9 @@ class FakeBleService implements BleService {
   @override
   Future<void> reconnect(BleDiscoveredDevice device) async {
     reconnectCalls += 1;
+    if (failReconnect) {
+      throw StateError('BLE reconnect failed');
+    }
   }
 
   @override
@@ -523,7 +682,7 @@ class FakeBleService implements BleService {
     required WifiCredentials credentials,
   }) async {
     savedWifiCredentials = credentials;
-    return const SaveWifiSettingsResponse(restartScheduled: true);
+    return SaveWifiSettingsResponse(restartScheduled: restartScheduled);
   }
 
   @override
@@ -538,6 +697,23 @@ class FakeBleService implements BleService {
 
   @override
   Future<void> dispose() async {}
+}
+
+class FakePhoneWifiService implements PhoneWifiService {
+  FakePhoneWifiService({
+    this.snapshot = const PhoneWifiSnapshot(
+      currentSsid: 'Garden',
+      networks: [
+        PhoneWifiNetwork(ssid: 'Garden', signalLevel: -45),
+        PhoneWifiNetwork(ssid: 'Greenhouse', signalLevel: -63),
+      ],
+    ),
+  });
+
+  final PhoneWifiSnapshot snapshot;
+
+  @override
+  Future<PhoneWifiSnapshot> readWifiSnapshot() async => snapshot;
 }
 
 class FakeLocalControllerApiClient implements LocalControllerApiClient {

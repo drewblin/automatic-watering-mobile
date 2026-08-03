@@ -11,14 +11,16 @@ import 'ble_onboarding_state.dart';
 import 'ble_onboarding_state_store.dart';
 import 'ble_pairing_flow.dart';
 import 'ble_wifi_provisioning_flow.dart';
+import 'phone_wifi_service.dart';
 import 'wifi_provisioning_models.dart';
 
 class BleOnboardingController extends ChangeNotifier {
   BleOnboardingController({
     required BleService bleService,
+    required PhoneWifiService phoneWifiService,
     required OnboardingAppService onboardingStorage,
     required LocalControllerApiClient localControllerApiClient,
-    Duration rebootDelay = const Duration(seconds: 3),
+    Duration rebootDelay = const Duration(seconds: 4),
     Duration reconnectRetryDelay = const Duration(seconds: 2),
     Duration readCurrentWifiSettingsTimeout = const Duration(seconds: 90),
     int maxReconnectAttempts = 5,
@@ -40,6 +42,7 @@ class BleOnboardingController extends ChangeNotifier {
       session: _session,
       stateStore: _stateStore,
       bleService: _bleService,
+      phoneWifiService: phoneWifiService,
       rebootDelay: rebootDelay,
       reconnectRetryDelay: reconnectRetryDelay,
       readCurrentSettingsTimeout: readCurrentWifiSettingsTimeout,
@@ -99,6 +102,10 @@ class BleOnboardingController extends ChangeNotifier {
 
   Future<void> saveWifiSettings(WifiCredentials credentials) {
     return _wifi.saveWifiSettings(credentials);
+  }
+
+  void skipWifiSettings() {
+    _wifi.skipWifiSettings();
   }
 
   Future<void> retryWifiReconnect() => _wifi.retryWifiReconnect();

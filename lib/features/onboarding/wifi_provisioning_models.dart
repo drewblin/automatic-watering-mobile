@@ -11,6 +11,28 @@ enum WifiProvisioningOperation {
 }
 
 @immutable
+class PhoneWifiNetwork {
+  const PhoneWifiNetwork({
+    required this.ssid,
+    this.signalLevel,
+  });
+
+  final String ssid;
+  final int? signalLevel;
+}
+
+@immutable
+class PhoneWifiSnapshot {
+  const PhoneWifiSnapshot({
+    required this.networks,
+    this.currentSsid,
+  });
+
+  final List<PhoneWifiNetwork> networks;
+  final String? currentSsid;
+}
+
+@immutable
 class WifiCredentials {
   const WifiCredentials({
     required this.ssid,

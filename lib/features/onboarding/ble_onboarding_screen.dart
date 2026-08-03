@@ -93,6 +93,7 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
           onUsePhoneWifi: widget.controller.useCurrentPhoneWifi,
           onReadCurrentSettings: widget.controller.readCurrentWifiSettings,
           onSave: widget.controller.saveWifiSettings,
+          onSkip: widget.controller.skipWifiSettings,
           onCredentialsChanged: widget.controller.updateWifiCredentials,
           onRetryReconnect: widget.controller.retryWifiReconnect,
         ),

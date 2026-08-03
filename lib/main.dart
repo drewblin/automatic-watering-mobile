@@ -14,6 +14,7 @@ import 'features/ble/flutter_reactive_ble_service.dart';
 import 'features/controller_settings/controller_settings_repository.dart';
 import 'features/local_controller/local_controller_api_client.dart';
 import 'features/onboarding/ble_onboarding_controller.dart';
+import 'features/onboarding/phone_wifi_service.dart';
 import 'storage/local_watering_hub_storage.dart';
 import 'storage/secure_watering_hub_token_storage.dart';
 
@@ -61,6 +62,7 @@ Future<void> main() async {
       );
       final bleOnboardingController = BleOnboardingController(
         bleService: FlutterReactiveBleService(),
+        phoneWifiService: PluginPhoneWifiService(),
         onboardingStorage: onboardingService,
         localControllerApiClient: localControllerApiClient,
       );

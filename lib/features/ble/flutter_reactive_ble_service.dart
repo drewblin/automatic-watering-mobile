@@ -261,11 +261,18 @@ class FlutterReactiveBleService implements BleService {
       characteristic,
       value: utf8.encode(jsonEncode(credentials.toBleJson())),
     );
-    final responseValue = await _ble.readCharacteristic(characteristic);
-    final envelope = _decodeEnvelope<SaveWifiSettingsResponse>(
-      responseValue,
-      SaveWifiSettingsResponse.fromJson,
-    );
+
+    ApiEnvelope<SaveWifiSettingsResponse> envelope;
+    try {
+      final responseValue = await _ble.readCharacteristic(characteristic);
+      envelope = _decodeEnvelope<SaveWifiSettingsResponse>(
+        responseValue,
+        SaveWifiSettingsResponse.fromJson,
+      );
+    } catch (_) {
+      return const SaveWifiSettingsResponse(restartScheduled: true);
+    }
+
     if (!envelope.success) {
       throw StateError(envelope.error ?? 'Wi-Fi settings save failed');
     }

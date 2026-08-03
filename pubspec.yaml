@@ -13,8 +13,10 @@ dependencies:
   crypto: ^3.0.6
   flutter_reactive_ble: ^5.4.0
   flutter_secure_storage: ^9.2.4
+  network_info_plus: ^7.0.0
   permission_handler: ^11.3.1
   shared_preferences: ^2.5.3
+  wifi_scan: ^0.4.1+2
 
 dev_dependencies:
   flutter_test:

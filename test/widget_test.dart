@@ -8,6 +8,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
+import 'package:automatic_watering_mobile/features/onboarding/phone_wifi_service.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
@@ -23,6 +24,7 @@ void main() {
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
     );
@@ -53,6 +55,7 @@ void main() {
     );
     final bleOnboardingController = BleOnboardingController(
       bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
     );
@@ -95,6 +98,7 @@ void main() {
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
     );
@@ -169,6 +173,7 @@ void main() {
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
     );
@@ -215,6 +220,7 @@ void main() {
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
     );
@@ -266,6 +272,7 @@ void main() {
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
       bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
     );
@@ -443,4 +450,17 @@ class FakeBleService implements BleService {
 
   @override
   Future<void> dispose() async {}
+}
+
+class FakePhoneWifiService implements PhoneWifiService {
+  @override
+  Future<PhoneWifiSnapshot> readWifiSnapshot() async {
+    return const PhoneWifiSnapshot(
+      currentSsid: 'Garden',
+      networks: [
+        PhoneWifiNetwork(ssid: 'Garden', signalLevel: -45),
+        PhoneWifiNetwork(ssid: 'Greenhouse', signalLevel: -63),
+      ],
+    );
+  }
 }

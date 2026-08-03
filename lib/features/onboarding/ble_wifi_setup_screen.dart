@@ -12,6 +12,7 @@ class BleWifiSetupScreen extends StatelessWidget {
     required this.onUsePhoneWifi,
     required this.onReadCurrentSettings,
     required this.onSave,
+    required this.onSkip,
     required this.onCredentialsChanged,
     required this.onRetryReconnect,
     super.key,
@@ -21,6 +22,7 @@ class BleWifiSetupScreen extends StatelessWidget {
   final VoidCallback onUsePhoneWifi;
   final VoidCallback onReadCurrentSettings;
   final ValueChanged<WifiCredentials> onSave;
+  final VoidCallback onSkip;
   final ValueChanged<WifiCredentials> onCredentialsChanged;
   final VoidCallback onRetryReconnect;
 
@@ -35,6 +37,7 @@ class BleWifiSetupScreen extends StatelessWidget {
           onUsePhoneWifi: onUsePhoneWifi,
           onReadCurrentSettings: onReadCurrentSettings,
           onSave: onSave,
+          onSkip: onSkip,
           onCredentialsChanged: onCredentialsChanged,
           onRetryReconnect: onRetryReconnect,
         ),

@@ -142,12 +142,16 @@ final class WifiCredentialsFormReady extends BleOnboardingState {
     required this.device,
     required this.credentials,
     this.validationErrors = const {},
+    this.phoneWifiNetworks = const [],
+    this.isLoadingPhoneWifiNetworks = false,
     this.error,
   }) : assert(credentials.password == '');
 
   final BleDiscoveredDevice device;
   final WifiCredentials credentials;
   final Map<String, String> validationErrors;
+  final List<PhoneWifiNetwork> phoneWifiNetworks;
+  final bool isLoadingPhoneWifiNetworks;
   final WifiProvisioningError? error;
 
   @override

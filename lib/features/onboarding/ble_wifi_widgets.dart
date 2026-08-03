@@ -9,6 +9,7 @@ class BleWifiProvisioningStep extends StatelessWidget {
     required this.onUsePhoneWifi,
     required this.onReadCurrentSettings,
     required this.onSave,
+    required this.onSkip,
     required this.onCredentialsChanged,
     required this.onRetryReconnect,
     super.key,
@@ -18,6 +19,7 @@ class BleWifiProvisioningStep extends StatelessWidget {
   final VoidCallback onUsePhoneWifi;
   final VoidCallback onReadCurrentSettings;
   final ValueChanged<WifiCredentials> onSave;
+  final VoidCallback onSkip;
   final ValueChanged<WifiCredentials> onCredentialsChanged;
   final VoidCallback onRetryReconnect;
 
@@ -32,6 +34,7 @@ class BleWifiProvisioningStep extends StatelessWidget {
           onUsePhoneWifi: onUsePhoneWifi,
           onReadCurrentSettings: onReadCurrentSettings,
           onSave: onSave,
+          onSkip: onSkip,
           onCredentialsChanged: onCredentialsChanged,
         ),
       SavingWifiSettings() => const _WifiProgressStatus(
@@ -57,6 +60,7 @@ class _WifiCredentialsForm extends StatefulWidget {
     required this.onUsePhoneWifi,
     required this.onReadCurrentSettings,
     required this.onSave,
+    required this.onSkip,
     required this.onCredentialsChanged,
   });
 
@@ -64,6 +68,7 @@ class _WifiCredentialsForm extends StatefulWidget {
   final VoidCallback onUsePhoneWifi;
   final VoidCallback onReadCurrentSettings;
   final ValueChanged<WifiCredentials> onSave;
+  final VoidCallback onSkip;
   final ValueChanged<WifiCredentials> onCredentialsChanged;
 
   @override
@@ -101,6 +106,7 @@ class _WifiCredentialsFormState extends State<_WifiCredentialsForm> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final openNetwork = state.wifiCredentials.openNetwork;
+    final phoneWifiNetworks = state.phoneWifiNetworks;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -115,15 +121,33 @@ class _WifiCredentialsFormState extends State<_WifiCredentialsForm> {
           ),
         ],
         const SizedBox(height: 12),
-        TextField(
-          controller: _ssidController,
-          decoration: InputDecoration(
-            labelText: 'Назва Wi-Fi мережі',
-            hintText: 'Наприклад Домашня мережа',
-            errorText: state.wifiValidationErrors['ssid'],
-            border: const OutlineInputBorder(),
+        if (phoneWifiNetworks.isEmpty)
+          TextField(
+            controller: _ssidController,
+            decoration: InputDecoration(
+              labelText: 'Назва Wi-Fi мережі',
+              hintText: 'Наприклад Домашня мережа',
+              errorText: state.wifiValidationErrors['ssid'],
+              border: const OutlineInputBorder(),
+            ),
+          )
+        else
+          DropdownButtonFormField<String>(
+            initialValue: _selectedNetworkSsid(phoneWifiNetworks),
+            decoration: InputDecoration(
+              labelText: 'Wi-Fi мережа',
+              errorText: state.wifiValidationErrors['ssid'],
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              for (final network in phoneWifiNetworks)
+                DropdownMenuItem(
+                  value: network.ssid,
+                  child: Text(_networkLabel(network)),
+                ),
+            ],
+            onChanged: _selectPhoneWifiNetwork,
           ),
-        ),
         const SizedBox(height: 12),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -154,9 +178,22 @@ class _WifiCredentialsFormState extends State<_WifiCredentialsForm> {
               label: const Text('Прочитати з контролера'),
             ),
             OutlinedButton.icon(
-              onPressed: widget.onUsePhoneWifi,
-              icon: const Icon(Icons.wifi),
-              label: const Text('Використати поточну Wi-Fi мережу телефону'),
+              onPressed: state.isLoadingPhoneWifiNetworks
+                  ? null
+                  : widget.onUsePhoneWifi,
+              icon: state.isLoadingPhoneWifiNetworks
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.wifi),
+              label: Text(
+                state.isLoadingPhoneWifiNetworks
+                    ? 'Читаємо Wi-Fi телефону'
+                    : phoneWifiNetworks.isEmpty
+                        ? 'Знайти Wi-Fi мережі телефону'
+                        : 'Оновити список Wi-Fi телефону',
+              ),
             ),
           ],
         ),
@@ -166,6 +203,14 @@ class _WifiCredentialsFormState extends State<_WifiCredentialsForm> {
           icon: const Icon(Icons.save),
           label: const Text('Зберегти Wi-Fi налаштування'),
         ),
+        if (state.wifiCredentials.ssid.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: widget.onSkip,
+            icon: const Icon(Icons.skip_next),
+            label: const Text('Залишити Wi-Fi без змін'),
+          ),
+        ],
       ],
     );
   }
@@ -180,6 +225,30 @@ class _WifiCredentialsFormState extends State<_WifiCredentialsForm> {
       ),
     );
     if (value) _passwordController.clear();
+  }
+
+  String? _selectedNetworkSsid(List<PhoneWifiNetwork> networks) {
+    final ssid = _ssidController.text.trim();
+    if (networks.any((network) => network.ssid == ssid)) {
+      return ssid;
+    }
+    return networks.isEmpty ? null : networks.first.ssid;
+  }
+
+  void _selectPhoneWifiNetwork(String? ssid) {
+    if (ssid == null) {
+      return;
+    }
+    _ssidController.text = ssid;
+    widget.onCredentialsChanged(_credentialsFromFields());
+  }
+
+  String _networkLabel(PhoneWifiNetwork network) {
+    final signalLevel = network.signalLevel;
+    if (signalLevel == null) {
+      return network.ssid;
+    }
+    return '${network.ssid} ($signalLevel dBm)';
   }
 
   WifiCredentials _credentialsFromFields() {

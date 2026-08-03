@@ -6,6 +6,7 @@ import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
 import 'ble_onboarding_state_store.dart';
+import 'phone_wifi_service.dart';
 import 'wifi_provisioning_models.dart';
 
 class BleWifiProvisioningFlow {
@@ -13,6 +14,7 @@ class BleWifiProvisioningFlow {
     required BleOnboardingSession session,
     required BleOnboardingStateStore stateStore,
     required BleService bleService,
+    required PhoneWifiService phoneWifiService,
     required Duration rebootDelay,
     required Duration reconnectRetryDelay,
     required int maxReconnectAttempts,
@@ -20,6 +22,7 @@ class BleWifiProvisioningFlow {
   })  : _session = session,
         _stateStore = stateStore,
         _bleService = bleService,
+        _phoneWifiService = phoneWifiService,
         _rebootDelay = rebootDelay,
         _reconnectRetryDelay = reconnectRetryDelay,
         _maxReconnectAttempts = maxReconnectAttempts,
@@ -28,6 +31,7 @@ class BleWifiProvisioningFlow {
   final BleOnboardingSession _session;
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
+  final PhoneWifiService _phoneWifiService;
   final Duration _rebootDelay;
   final Duration _reconnectRetryDelay;
   final int _maxReconnectAttempts;
@@ -42,6 +46,7 @@ class BleWifiProvisioningFlow {
       WifiCredentialsFormReady(
         device: state.device,
         credentials: credentials.sanitizedForState,
+        phoneWifiNetworks: state.phoneWifiNetworks,
       ),
     );
   }
@@ -51,18 +56,44 @@ class BleWifiProvisioningFlow {
     if (state is! WifiCredentialsFormReady) {
       return;
     }
+    final previousCredentials = state.credentials.sanitizedForState;
     _stateStore.setState(
       WifiCredentialsFormReady(
         device: state.device,
-        credentials: state.credentials.sanitizedForState,
-        error: bleOnboardingWifiError(
-          message:
-              'Автопідстановка поточної Wi-Fi мережі недоступна на цій платформі.',
-          operation: WifiProvisioningOperation.phoneWifiAutofill,
-          error: UnsupportedError('Phone Wi-Fi platform API is not configured'),
-        ),
+        credentials: previousCredentials,
+        phoneWifiNetworks: state.phoneWifiNetworks,
+        isLoadingPhoneWifiNetworks: true,
       ),
     );
+
+    try {
+      final snapshot = await _phoneWifiService.readWifiSnapshot();
+      final selectedSsid =
+          snapshot.currentSsid ?? snapshot.networks.firstOrNull?.ssid;
+      _stateStore.setState(
+        WifiCredentialsFormReady(
+          device: state.device,
+          credentials: selectedSsid == null
+              ? previousCredentials
+              : previousCredentials.copyWith(ssid: selectedSsid),
+          phoneWifiNetworks: snapshot.networks,
+        ),
+      );
+    } catch (error) {
+      _stateStore.setState(
+        WifiCredentialsFormReady(
+          device: state.device,
+          credentials: previousCredentials,
+          phoneWifiNetworks: state.phoneWifiNetworks,
+          error: bleOnboardingWifiError(
+            message:
+                'Не вдалося прочитати Wi-Fi мережі телефону. Перевірте дозволи Wi-Fi/локації і що геолокацію увімкнено.',
+            operation: WifiProvisioningOperation.phoneWifiAutofill,
+            error: error,
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> readCurrentWifiSettingsFromState() async {
@@ -141,6 +172,7 @@ class BleWifiProvisioningFlow {
           device: device,
           credentials: publicCredentials,
           validationErrors: validationErrors,
+          phoneWifiNetworks: state.phoneWifiNetworks,
           error: const WifiProvisioningError(
             message: 'Перевірте поля Wi-Fi.',
             technicalReason: 'Validation failed',
@@ -159,30 +191,16 @@ class BleWifiProvisioningFlow {
     );
 
     try {
-      final response = await _bleService.saveWifiSettings(
+      await _saveWifiSettingsOnController(
         deviceId: device.id,
         credentials: normalized,
       );
-      if (!response.restartScheduled) {
-        throw StateError('Controller did not schedule restart');
-      }
-
-      _stateStore.setState(
-        WaitingForControllerReboot(
-          device: device,
-          credentials: publicCredentials,
-        ),
-      );
-
-      await Future<void>.delayed(_rebootDelay);
-      await _bleService.disconnect(device.id);
-      _session.isBleConnected = false;
-      await reconnectAfterReboot(device, publicCredentials);
     } catch (error) {
       _stateStore.setState(
         WifiCredentialsFormReady(
           device: device,
           credentials: publicCredentials,
+          phoneWifiNetworks: state.phoneWifiNetworks,
           error: bleOnboardingWifiError(
             message: 'Контролер не прийняв Wi-Fi налаштування.',
             operation: WifiProvisioningOperation.saveSettings,
@@ -190,6 +208,55 @@ class BleWifiProvisioningFlow {
           ),
         ),
       );
+      return;
+    }
+
+    _stateStore.setState(
+      WaitingForControllerReboot(
+        device: device,
+        credentials: publicCredentials,
+      ),
+    );
+
+    await Future<void>.delayed(_rebootDelay);
+    await _disconnectAfterAcceptedWifiSave(device.id);
+    await reconnectAfterReboot(device, publicCredentials);
+  }
+
+  void skipWifiSettings() {
+    final state = _stateStore.state;
+    if (state is! WifiCredentialsFormReady ||
+        state.credentials.ssid.trim().isEmpty) {
+      return;
+    }
+    _stateStore.setState(
+      AccessSetupReady(
+        device: state.device,
+        credentials: state.credentials.sanitizedForState,
+      ),
+    );
+  }
+
+  Future<void> _saveWifiSettingsOnController({
+    required String deviceId,
+    required WifiCredentials credentials,
+  }) async {
+    final response = await _bleService.saveWifiSettings(
+      deviceId: deviceId,
+      credentials: credentials,
+    );
+    if (!response.restartScheduled) {
+      throw StateError('Controller did not schedule restart');
+    }
+  }
+
+  Future<void> _disconnectAfterAcceptedWifiSave(String deviceId) async {
+    try {
+      await _bleService.disconnect(deviceId);
+    } catch (_) {
+      // The controller may already be rebooting and have dropped the BLE link.
+    } finally {
+      _session.isBleConnected = false;
     }
   }
 
