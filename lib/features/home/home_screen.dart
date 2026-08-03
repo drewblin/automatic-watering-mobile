@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_state.dart';
 import '../../app/status_panel.dart';
+import '../controller_settings/controller_settings_save_controller.dart';
 import '../controller_settings/controller_settings_screen.dart';
 import '../onboarding/ble_onboarding_controller.dart';
 import '../onboarding/ble_onboarding_screen.dart';
@@ -11,12 +12,14 @@ class HomeScreen extends StatelessWidget {
     required this.state,
     required this.onOnboardingComplete,
     required this.bleOnboardingController,
+    required this.settingsSaveController,
     super.key,
   });
 
   final AppState state;
   final Future<void> Function() onOnboardingComplete;
   final BleOnboardingController bleOnboardingController;
+  final ControllerSettingsSaveController settingsSaveController;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +34,7 @@ class HomeScreen extends StatelessWidget {
             ),
           AppStartupStatus.ready => _ReadyStatePanel(
               state: state,
+              settingsSaveController: settingsSaveController,
             ),
         },
       ),
@@ -41,9 +45,11 @@ class HomeScreen extends StatelessWidget {
 class _ReadyStatePanel extends StatelessWidget {
   const _ReadyStatePanel({
     required this.state,
+    required this.settingsSaveController,
   });
 
   final AppState state;
+  final ControllerSettingsSaveController settingsSaveController;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +64,10 @@ class _ReadyStatePanel extends StatelessWidget {
             subtitle: 'Контролер доступний',
           ),
           const SizedBox(height: 16),
-          _ReadyHubActions(state: state),
+          _ReadyHubActions(
+            state: state,
+            settingsSaveController: settingsSaveController,
+          ),
         ],
       ),
     );
@@ -68,9 +77,11 @@ class _ReadyStatePanel extends StatelessWidget {
 class _ReadyHubActions extends StatelessWidget {
   const _ReadyHubActions({
     required this.state,
+    required this.settingsSaveController,
   });
 
   final AppState state;
+  final ControllerSettingsSaveController settingsSaveController;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +98,7 @@ class _ReadyHubActions extends StatelessWidget {
                 builder: (_) => ControllerSettingsScreen(
                   settings: settings,
                   deviceObjects: state.deviceObjects,
+                  saveController: settingsSaveController,
                 ),
               ),
             );

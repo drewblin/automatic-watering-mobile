@@ -1,5 +1,6 @@
 import '../local_controller/local_controller_api_client.dart';
 import '../watering_hubs/watering_hub.dart';
+import 'controller_settings.dart';
 import 'settings_response_data.dart';
 
 class ControllerSettingsRepository {
@@ -22,6 +23,17 @@ class ControllerSettingsRepository {
     return _apiClient.getSettings(
       ipAddress: ipAddress,
       apiAccessToken: token,
+    );
+  }
+
+  Future<void> saveSettings(
+    WateringHub hub,
+    ControllerSettings settings,
+  ) async {
+    await _apiClient.putSettings(
+      ipAddress: hub.lastKnownIpAddress!,
+      apiAccessToken: hub.apiAccessToken!,
+      settings: settings,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:automatic_watering_mobile/app/app_startup_service.dart';
 import 'package:automatic_watering_mobile/app/app_state_store.dart';
 import 'package:automatic_watering_mobile/app/onboarding_app_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_save_controller.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 class TestAppComposition {
@@ -27,6 +28,13 @@ class TestAppComposition {
     appController = AppController(
       stateStore: stateStore,
       startupService: startup,
+      settingsSaveController: ControllerSettingsSaveController(
+        stateStore: stateStore,
+        repository: controllerSettingsRepository,
+        rebootDelay: Duration.zero,
+        reconnectAttemptDelay: Duration.zero,
+        reconnectTimeout: const Duration(seconds: 1),
+      ),
     );
   }
 

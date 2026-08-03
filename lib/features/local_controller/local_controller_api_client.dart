@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../../core/api_envelope.dart';
+import '../controller_settings/controller_settings.dart';
 import '../controller_settings/settings_response_data.dart';
 
 enum LocalControllerApiErrorKind {
@@ -35,6 +36,12 @@ abstract interface class LocalControllerApiClient {
   Future<SettingsResponseData> getSettings({
     required String ipAddress,
     required String apiAccessToken,
+  });
+
+  Future<void> putSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ControllerSettings settings,
   });
 }
 
@@ -77,9 +84,55 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       request.headers
           .set(HttpHeaders.authorizationHeader, 'Bearer $apiAccessToken');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.persistentConnection = false;
 
       final response = await request.close().timeout(_timeout);
       return await _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const LocalControllerApiException(
+        LocalControllerApiErrorKind.networkUnavailable,
+        'Controller HTTPS request timed out',
+      );
+    } on HandshakeException catch (_) {
+      throw const LocalControllerApiException(
+        LocalControllerApiErrorKind.tlsCertificate,
+        'Controller TLS certificate check failed',
+      );
+    } on TlsException catch (_) {
+      throw const LocalControllerApiException(
+        LocalControllerApiErrorKind.tlsCertificate,
+        'Controller TLS certificate check failed',
+      );
+    } on SocketException catch (_) {
+      throw const LocalControllerApiException(
+        LocalControllerApiErrorKind.networkUnavailable,
+        'Controller network is unavailable',
+      );
+    }
+  }
+
+  @override
+  Future<void> putSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ControllerSettings settings,
+  }) async {
+    HttpClientRequest request;
+    try {
+      request = await _httpClient
+          .putUrl(Uri(scheme: 'https', host: ipAddress, path: '/api/settings'))
+          .timeout(_timeout);
+      request.headers
+          .set(HttpHeaders.authorizationHeader, 'Bearer $apiAccessToken');
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.persistentConnection = false;
+      final body = utf8.encode(jsonEncode(settings.toJson()));
+      request.contentLength = body.length;
+      request.add(body);
+
+      final response = await request.close().timeout(_timeout);
+      await _handleEmptyResponse(response);
     } on TimeoutException catch (_) {
       throw const LocalControllerApiException(
         LocalControllerApiErrorKind.networkUnavailable,
@@ -129,7 +182,9 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       );
     }
 
-    final body = await response.transform(utf8.decoder).join();
+    final body = await response.transform(utf8.decoder).join().timeout(
+          _timeout,
+        );
     try {
       final decoded = jsonDecode(body);
       if (decoded is! Map<String, Object?>) {
@@ -154,6 +209,39 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
         error.message,
       );
     }
+  }
+
+  Future<void> _handleEmptyResponse(HttpClientResponse response) async {
+    final statusCode = response.statusCode;
+    if (statusCode == HttpStatus.ok) {
+      await response.drain<void>();
+      return;
+    }
+    if (statusCode == HttpStatus.badRequest) {
+      final body = await response.transform(utf8.decoder).join().timeout(
+            _timeout,
+          );
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, Object?>) {
+        throw const LocalControllerApiException(
+          LocalControllerApiErrorKind.unexpectedResponse,
+          'Помилка валідації на контролері.',
+        );
+      }
+      final envelope = ApiEnvelope<Map<String, Object?>>.fromJson(
+        decoded,
+        (data) => data is Map<String, Object?> ? data : <String, Object?>{},
+      );
+      throw LocalControllerApiException(
+        LocalControllerApiErrorKind.unexpectedResponse,
+        envelope.error!,
+      );
+    }
+    await response.drain<void>();
+    throw LocalControllerApiException(
+      LocalControllerApiErrorKind.unexpectedResponse,
+      'помилка, http код відповіді - $statusCode',
+    );
   }
 
   static HttpClient _createPinnedHttpClient(String expectedFingerprint) {
