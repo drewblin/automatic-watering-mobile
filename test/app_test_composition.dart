@@ -4,16 +4,21 @@ import 'package:automatic_watering_mobile/app/app_state_store.dart';
 import 'package:automatic_watering_mobile/app/onboarding_app_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_save_controller.dart';
+import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
+import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 class TestAppComposition {
   TestAppComposition({
     InMemoryWateringHubStorage? wateringHubStorage,
     InMemoryWateringHubTokenStorage? tokenStorage,
-    required ControllerSettingsRepository controllerSettingsRepository,
+    required LocalControllerApiClient localControllerApiClient,
   })  : wateringHubStorage = wateringHubStorage ?? InMemoryWateringHubStorage(),
         tokenStorage = tokenStorage ?? InMemoryWateringHubTokenStorage() {
     final stateStore = AppStateStore();
+    final controllerSettingsRepository = ControllerSettingsRepository(
+      apiClient: localControllerApiClient,
+    );
     final startup = AppStartupService(
       stateStore: stateStore,
       wateringHubStorage: this.wateringHubStorage,
@@ -34,6 +39,11 @@ class TestAppComposition {
         rebootDelay: Duration.zero,
         reconnectAttemptDelay: Duration.zero,
         reconnectTimeout: const Duration(seconds: 1),
+      ),
+      homeDashboardController: HomeDashboardController(
+        stateStore: stateStore,
+        settingsRepository: controllerSettingsRepository,
+        apiClient: localControllerApiClient,
       ),
     );
   }

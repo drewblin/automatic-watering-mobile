@@ -16,6 +16,11 @@ enum DeviceObjectType {
   }
 }
 
+enum WaterCounterObjectKind {
+  magistral,
+  leaf,
+}
+
 sealed class DeviceObject {
   const DeviceObject({
     required this.id,
@@ -73,6 +78,7 @@ class WaterCounterObject extends DeviceObject {
   WaterCounterObject({
     required super.wateringHubId,
     required this.setting,
+    required this.kind,
   }) : super(
           id: '$wateringHubId:${DeviceObjectType.waterCounter.storageName}:${setting.pin}',
           type: DeviceObjectType.waterCounter,
@@ -80,6 +86,7 @@ class WaterCounterObject extends DeviceObject {
         );
 
   final WaterCounterSetting setting;
+  final WaterCounterObjectKind kind;
 }
 
 List<DeviceObject> buildDeviceObjects({
@@ -103,11 +110,13 @@ List<DeviceObject> buildDeviceObjects({
       WaterCounterObject(
         wateringHubId: wateringHubId,
         setting: counter,
+        kind: WaterCounterObjectKind.magistral,
       ),
     ...settings.leafWaterCounterSettings.map(
       (setting) => WaterCounterObject(
         wateringHubId: wateringHubId,
         setting: setting,
+        kind: WaterCounterObjectKind.leaf,
       ),
     ),
   ]);

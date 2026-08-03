@@ -119,6 +119,8 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
             bleOnboardingController: widget.bleOnboardingController,
             settingsSaveController:
                 widget.appController.settingsSaveController,
+            homeDashboardController:
+                widget.appController.homeDashboardController,
           );
         },
       ),

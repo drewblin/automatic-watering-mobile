@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_test_composition.dart';
-import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
@@ -39,9 +39,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: client,
-      ),
+      localControllerApiClient: client,
     );
     final appController = composition.appController;
 
@@ -126,5 +124,21 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
     required String ipAddress,
     required String apiAccessToken,
     required ControllerSettings settings,
+  }) async {}
+
+  @override
+  Future<List<ControllerSensorMetric>> getSensorMetrics({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<void> openValveForTime({
+    required String ipAddress,
+    required String apiAccessToken,
+    required int pin,
+    required int seconds,
   }) async {}
 }

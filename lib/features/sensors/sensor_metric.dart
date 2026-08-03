@@ -26,6 +26,39 @@ enum SensorType {
   }
 }
 
+class ControllerSensorMetric {
+  const ControllerSensorMetric({
+    required this.sensorId,
+    required this.sensorType,
+    required this.name,
+    required this.value,
+    required this.uptimeMs,
+    required this.receivedAt,
+  });
+
+  final int sensorId;
+  final SensorType sensorType;
+  final String name;
+  final double? value;
+  final int uptimeMs;
+  final DateTime receivedAt;
+
+  factory ControllerSensorMetric.fromJson({
+    required Map<String, Object?> json,
+    required DateTime receivedAt,
+  }) {
+    final rawValue = json['value'];
+    return ControllerSensorMetric(
+      sensorId: readInt(json['sensorId'], 'sensorId'),
+      sensorType: SensorType.fromJson(json['sensorType']),
+      name: readString(json['name'], 'name'),
+      value: rawValue == null ? null : readDouble(rawValue, 'value'),
+      uptimeMs: readInt(json['uptimeMs'], 'uptimeMs'),
+      receivedAt: receivedAt,
+    );
+  }
+}
+
 class SensorMetric {
   const SensorMetric({
     required this.deviceObjectId,
@@ -45,20 +78,18 @@ class SensorMetric {
   final int uptimeMs;
   final DateTime timestamp;
 
-  factory SensorMetric.fromControllerJson({
-    required Map<String, Object?> json,
+  factory SensorMetric.fromControllerMetric({
+    required ControllerSensorMetric metric,
     required String deviceObjectId,
-    required DateTime receivedAt,
   }) {
-    final rawValue = json['value'];
     return SensorMetric(
       deviceObjectId: deviceObjectId,
-      sensorId: readInt(json['sensorId'], 'sensorId'),
-      sensorType: SensorType.fromJson(json['sensorType']),
-      name: readString(json['name'], 'name'),
-      value: rawValue == null ? null : readDouble(rawValue, 'value'),
-      uptimeMs: readInt(json['uptimeMs'], 'uptimeMs'),
-      timestamp: receivedAt,
+      sensorId: metric.sensorId,
+      sensorType: metric.sensorType,
+      name: metric.name,
+      value: metric.value,
+      uptimeMs: metric.uptimeMs,
+      timestamp: metric.receivedAt,
     );
   }
 

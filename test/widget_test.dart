@@ -5,22 +5,23 @@ import 'package:automatic_watering_mobile/app/automatic_watering_app.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
-import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/phone_wifi_service.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
+import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 void main() {
   testWidgets('shows BLE onboarding after startup without a device',
       (tester) async {
+    final client = FakeSettingsApiClient();
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: client,
     );
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
@@ -46,10 +47,11 @@ void main() {
 
   testWidgets('search button retries BLE availability when Bluetooth was off',
       (tester) async {
+    final client = FakeSettingsApiClient();
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: client,
     );
     final bleService = FakeBleService(
       availability: BleAvailability.bluetoothDisabled,
@@ -89,12 +91,11 @@ void main() {
     final createdAt = DateTime.utc(2026);
     final storage = InMemoryWateringHubStorage();
     final tokenStorage = InMemoryWateringHubTokenStorage();
+    final client = FakeSettingsApiClient();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: FakeSettingsApiClient(),
-      ),
+      localControllerApiClient: client,
     );
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
@@ -164,12 +165,11 @@ void main() {
       );
     final tokenStorage = InMemoryWateringHubTokenStorage()
       ..tokens['hub-aa-bb-cc'] = validToken;
+    final client = FakeSettingsApiClient();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: FakeSettingsApiClient(),
-      ),
+      localControllerApiClient: client,
     );
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
@@ -214,9 +214,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: client,
-      ),
+      localControllerApiClient: client,
     );
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
@@ -247,7 +245,7 @@ void main() {
 
     expect(find.text('Помилка запуску'), findsNothing);
     expect(find.text('Automatic Watering Hub'), findsOneWidget);
-    expect(find.text('Налаштування контролера'), findsOneWidget);
+    expect(find.byTooltip('Налаштування контролера'), findsOneWidget);
   });
 
   testWidgets('starts onboarding when saved controller access is incomplete',
@@ -268,7 +266,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeSettingsApiClient(),
     );
     final appController = composition.appController;
     final bleOnboardingController = BleOnboardingController(
@@ -293,10 +291,6 @@ void main() {
 
 const validToken =
     '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-
-ControllerSettingsRepository testSettingsRepository() {
-  return ControllerSettingsRepository(apiClient: FakeSettingsApiClient());
-}
 
 const settingsResponseDataJson = {
   'settings': {
@@ -358,6 +352,64 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
     required String ipAddress,
     required String apiAccessToken,
     required ControllerSettings settings,
+  }) async {}
+
+  @override
+  Future<List<ControllerSensorMetric>> getSensorMetrics({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    final receivedAt = DateTime.utc(2026, 8, 3, 10);
+    return [
+      ControllerSensorMetric.fromJson(
+        json: const {
+          'sensorId': 21,
+          'sensorType': 'pressure',
+          'name': 'Тиск',
+          'value': 2.4,
+          'uptimeMs': 1000,
+        },
+        receivedAt: receivedAt,
+      ),
+      ControllerSensorMetric.fromJson(
+        json: const {
+          'sensorId': 18,
+          'sensorType': 'water_counter',
+          'name': 'Магістраль',
+          'value': 15.5,
+          'uptimeMs': 1000,
+        },
+        receivedAt: receivedAt,
+      ),
+      ControllerSensorMetric.fromJson(
+        json: const {
+          'sensorId': 11,
+          'sensorType': 'soil_humidity',
+          'name': 'Вологість 1',
+          'value': 64.2,
+          'uptimeMs': 1000,
+        },
+        receivedAt: receivedAt,
+      ),
+      ControllerSensorMetric.fromJson(
+        json: const {
+          'sensorId': 11,
+          'sensorType': 'soil_temperature',
+          'name': 'Вологість 1',
+          'value': 21.8,
+          'uptimeMs': 1000,
+        },
+        receivedAt: receivedAt,
+      ),
+    ];
+  }
+
+  @override
+  Future<void> openValveForTime({
+    required String ipAddress,
+    required String apiAccessToken,
+    required int pin,
+    required int seconds,
   }) async {}
 }
 

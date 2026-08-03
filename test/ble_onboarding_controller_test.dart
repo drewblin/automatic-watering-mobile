@@ -8,13 +8,13 @@ import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
-import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
 import 'package:automatic_watering_mobile/features/onboarding/phone_wifi_service.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
+import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
@@ -24,7 +24,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -55,7 +55,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -105,7 +105,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -147,7 +147,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -177,7 +177,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -213,7 +213,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -247,7 +247,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -276,7 +276,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -308,7 +308,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -340,7 +340,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -377,7 +377,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -416,9 +416,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: localClient,
-      ),
+      localControllerApiClient: localClient,
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -466,7 +464,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -504,7 +502,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -544,7 +542,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -582,7 +580,7 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      controllerSettingsRepository: testSettingsRepository(),
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -668,11 +666,6 @@ const testDevice = BleDiscoveredDevice(
   isLikelyAutomaticWateringHub: true,
   advertisedServiceUuids: {AutomaticWateringBleConstants.serviceUuid},
 );
-
-ControllerSettingsRepository testSettingsRepository() {
-  return ControllerSettingsRepository(
-      apiClient: FakeLocalControllerApiClient());
-}
 
 class FakeBleService implements BleService {
   FakeBleService({
@@ -890,5 +883,21 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     required String ipAddress,
     required String apiAccessToken,
     required ControllerSettings settings,
+  }) async {}
+
+  @override
+  Future<List<ControllerSensorMetric>> getSensorMetrics({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<void> openValveForTime({
+    required String ipAddress,
+    required String apiAccessToken,
+    required int pin,
+    required int seconds,
   }) async {}
 }
