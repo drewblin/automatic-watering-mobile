@@ -429,6 +429,7 @@ void main() {
       localControllerApiClient: localClient,
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
     );
 
     controller.selectDevice(testDevice);
@@ -479,6 +480,7 @@ void main() {
       localControllerApiClient: localClient,
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
     );
 
     controller.selectDevice(testDevice);
@@ -493,6 +495,86 @@ void main() {
     expect(tokenStorage.tokens, isEmpty);
     expect(bleService.readApiAccessTokenCalls, 0);
     expect(localClient.checkCalls, 0);
+  });
+
+  test('bootstrap retries pending controller IP automatically', () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final bleService = FakeBleService(
+      wifiIpAddresses: const [
+        ControllerIpAddress('0.0.0.0'),
+        ControllerIpAddress('192.168.1.42'),
+      ],
+    );
+    final localClient = FakeLocalControllerApiClient();
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: localClient,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+      controllerAccessRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(bleService.readWifiIpAddressCalls, 2);
+    expect(localClient.checkCalls, 1);
+  });
+
+  test('bootstrap retries temporary HTTPS network errors automatically',
+      () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final bleService = FakeBleService();
+    final localClient = FakeLocalControllerApiClient(
+      exceptions: const [
+        LocalControllerApiException(
+          LocalControllerApiErrorKind.networkUnavailable,
+          'Controller network is unavailable',
+        ),
+      ],
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: localClient,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+      controllerAccessRetryDelay: Duration.zero,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(localClient.checkCalls, 2);
   });
 
   test('bootstrap maps HTTPS 401 to tokenInvalid state', () async {
@@ -595,14 +677,16 @@ class FakeBleService implements BleService {
   FakeBleService({
     this.currentWifi = const WifiCredentials(ssid: '', password: ''),
     this.wifiIpAddress = const ControllerIpAddress('192.168.1.42'),
+    List<ControllerIpAddress>? wifiIpAddresses,
     this.apiAccessToken = const ControllerApiAccessToken(validToken),
     this.hasAutomaticWateringService = true,
     this.restartScheduled = true,
     this.failReconnect = false,
-  });
+  }) : wifiIpAddresses = List.of(wifiIpAddresses ?? const []);
 
   final WifiCredentials currentWifi;
   final ControllerIpAddress wifiIpAddress;
+  final List<ControllerIpAddress> wifiIpAddresses;
   final ControllerApiAccessToken apiAccessToken;
   final bool hasAutomaticWateringService;
   final bool restartScheduled;
@@ -610,6 +694,7 @@ class FakeBleService implements BleService {
   WifiCredentials? savedWifiCredentials;
   int disconnectCalls = 0;
   int reconnectCalls = 0;
+  int readWifiIpAddressCalls = 0;
   int readApiAccessTokenCalls = 0;
   bool hangWifiSettingsRead = false;
 
@@ -667,6 +752,10 @@ class FakeBleService implements BleService {
 
   @override
   Future<ControllerIpAddress> readWifiIpAddress(String deviceId) async {
+    readWifiIpAddressCalls += 1;
+    if (wifiIpAddresses.isNotEmpty) {
+      return wifiIpAddresses.removeAt(0);
+    }
     return wifiIpAddress;
   }
 
@@ -717,9 +806,13 @@ class FakePhoneWifiService implements PhoneWifiService {
 }
 
 class FakeLocalControllerApiClient implements LocalControllerApiClient {
-  FakeLocalControllerApiClient({this.exception});
+  FakeLocalControllerApiClient({
+    this.exception,
+    List<LocalControllerApiException>? exceptions,
+  }) : exceptions = List.of(exceptions ?? const []);
 
   final LocalControllerApiException? exception;
+  final List<LocalControllerApiException> exceptions;
   int checkCalls = 0;
   String? checkedIpAddress;
   String? checkedToken;
@@ -732,6 +825,9 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     checkCalls += 1;
     checkedIpAddress = ipAddress;
     checkedToken = apiAccessToken;
+    if (exceptions.isNotEmpty) {
+      throw exceptions.removeAt(0);
+    }
     final exception = this.exception;
     if (exception != null) {
       throw exception;

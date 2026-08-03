@@ -17,17 +17,23 @@ class BleControllerAccessFlow {
     required BleService bleService,
     required OnboardingAppService onboardingStorage,
     required LocalControllerApiClient localControllerApiClient,
+    Duration retryDelay = const Duration(seconds: 2),
+    int maxAttempts = 5,
   })  : _session = session,
         _stateStore = stateStore,
         _bleService = bleService,
         _onboardingStorage = onboardingStorage,
-        _localControllerApiClient = localControllerApiClient;
+        _localControllerApiClient = localControllerApiClient,
+        _retryDelay = retryDelay,
+        _maxAttempts = maxAttempts;
 
   final BleOnboardingSession _session;
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
   final OnboardingAppService _onboardingStorage;
   final LocalControllerApiClient _localControllerApiClient;
+  final Duration _retryDelay;
+  final int _maxAttempts;
 
   Future<void> bootstrapControllerAccess() async {
     final state = _stateStore.state;
@@ -71,101 +77,157 @@ class BleControllerAccessFlow {
     required BleDiscoveredDevice device,
     required WifiCredentials credentials,
   }) async {
-    _stateStore.setState(
-      ReadingControllerAccess(
-        device: device,
-        credentials: credentials,
-      ),
-    );
+    Object? lastUnexpectedError;
+    ControllerAccessError? lastAccessError;
 
-    try {
-      if (!_session.isBleConnected) {
-        await _bleService.reconnect(device);
-        await _bleService.pairAndDiscoverServices(device);
-        _session.isBleConnected = true;
-      }
-
-      final ipAddress = await _bleService.readWifiIpAddress(device.id);
+    for (var attempt = 1; attempt <= _maxAttempts; ++attempt) {
       _stateStore.setState(
         ReadingControllerAccess(
           device: device,
           credentials: credentials,
-          ipAddress: ipAddress.value,
         ),
       );
 
-      if (ipAddress.isPending) {
+      try {
+        if (!_session.isBleConnected) {
+          await _bleService.reconnect(device);
+          await _bleService.pairAndDiscoverServices(device);
+          _session.isBleConnected = true;
+        }
+
+        final ipAddress = await _bleService.readWifiIpAddress(device.id);
         _stateStore.setState(
-          ControllerIpPending(
+          ReadingControllerAccess(
             device: device,
             credentials: credentials,
-            error: const ControllerAccessError(
-              kind: ControllerAccessFailureKind.ipPending,
-              message:
-                  'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.',
-              technicalReason: 'BLE WifiIpAddress returned 0.0.0.0',
+            ipAddress: ipAddress.value,
+          ),
+        );
+
+        if (ipAddress.isPending) {
+          lastAccessError = const ControllerAccessError(
+            kind: ControllerAccessFailureKind.ipPending,
+            message:
+                'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.',
+            technicalReason: 'BLE WifiIpAddress returned 0.0.0.0',
+          );
+          if (attempt < _maxAttempts) {
+            await Future<void>.delayed(_retryDelay);
+            continue;
+          }
+          _stateStore.setState(
+            ControllerIpPending(
+              device: device,
+              credentials: credentials,
+              error: lastAccessError,
             ),
+          );
+          return;
+        }
+
+        final token = await _bleService.readApiAccessToken(device.id);
+
+        await _savePairedHub(device);
+        final hub = _session.activeWateringHub!.copyWith(
+          lastKnownIpAddress: ipAddress.value,
+          updatedAt: DateTime.now().toUtc(),
+        );
+        _session.activeWateringHub =
+            await _onboardingStorage.saveControllerAccess(
+          hub: hub,
+          apiAccessToken: token.value,
+        );
+
+        _stateStore.setState(
+          CheckingLocalHttpsAccess(
+            device: device,
+            credentials: credentials,
+            ipAddress: ipAddress.value,
+          ),
+        );
+
+        await _localControllerApiClient.checkSettingsAccess(
+          ipAddress: ipAddress.value,
+          apiAccessToken: token.value,
+        );
+
+        await _onboardingStorage.completeOnboarding(
+          _session.activeWateringHub!,
+        );
+        _stateStore.setState(
+          ControllerAccessReady(
+            device: device,
+            credentials: credentials,
+            ipAddress: ipAddress.value,
           ),
         );
         return;
+      } on FatalAppException {
+        rethrow;
+      } on LocalControllerApiException catch (error) {
+        final kind = controllerAccessFailureKindFrom(error.kind);
+        lastAccessError = ControllerAccessError(
+          kind: kind,
+          message: controllerAccessMessage(kind),
+          technicalReason: error.message,
+        );
+        if (_shouldRetryAccessFailure(kind) && attempt < _maxAttempts) {
+          await Future<void>.delayed(_retryDelay);
+          continue;
+        }
+        _handleLocalControllerError(device, credentials, error);
+        return;
+      } catch (error) {
+        lastUnexpectedError = error;
+        _session.isBleConnected = false;
+        if (attempt < _maxAttempts) {
+          await Future<void>.delayed(_retryDelay);
+          continue;
+        }
+        break;
       }
+    }
 
-      final token = await _bleService.readApiAccessToken(device.id);
-
-      await _savePairedHub(device);
-      final hub = _session.activeWateringHub!.copyWith(
-        lastKnownIpAddress: ipAddress.value,
-        updatedAt: DateTime.now().toUtc(),
-      );
-      _session.activeWateringHub =
-          await _onboardingStorage.saveControllerAccess(
-        hub: hub,
-        apiAccessToken: token.value,
-      );
-
+    if (lastAccessError?.kind == ControllerAccessFailureKind.ipPending) {
       _stateStore.setState(
-        CheckingLocalHttpsAccess(
+        ControllerIpPending(
           device: device,
           credentials: credentials,
-          ipAddress: ipAddress.value,
+          error: lastAccessError!,
         ),
       );
+      return;
+    }
 
-      await _localControllerApiClient.checkSettingsAccess(
-        ipAddress: ipAddress.value,
-        apiAccessToken: token.value,
-      );
-
-      await _onboardingStorage.completeOnboarding(
-        _session.activeWateringHub!,
-      );
-      _stateStore.setState(
-        ControllerAccessReady(
-          device: device,
-          credentials: credentials,
-          ipAddress: ipAddress.value,
-        ),
-      );
-    } on FatalAppException {
-      rethrow;
-    } on LocalControllerApiException catch (error) {
-      _handleLocalControllerError(device, credentials, error);
-    } catch (error) {
-      _session.isBleConnected = false;
-      _stateStore.setState(
-        ControllerAccessFailed(
-          device: device,
-          credentials: credentials,
-          ipAddress: _stateStore.state.controllerIpAddress,
-          error: ControllerAccessError(
-            kind: ControllerAccessFailureKind.unexpectedResponse,
-            message:
-                'Не вдалося прочитати IP-адресу або токен доступу через BLE.',
-            technicalReason: safeOnboardingTechnicalReason(error),
+    _stateStore.setState(
+      ControllerAccessFailed(
+        device: device,
+        credentials: credentials,
+        ipAddress: _stateStore.state.controllerIpAddress,
+        error: ControllerAccessError(
+          kind: ControllerAccessFailureKind.unexpectedResponse,
+          message:
+              'Не вдалося прочитати IP-адресу або токен доступу через BLE.',
+          technicalReason: safeOnboardingTechnicalReason(
+            lastUnexpectedError ?? StateError('Controller access failed'),
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  bool _shouldRetryAccessFailure(ControllerAccessFailureKind kind) {
+    return switch (kind) {
+      ControllerAccessFailureKind.ipPending ||
+      ControllerAccessFailureKind.timeout ||
+      ControllerAccessFailureKind.networkUnavailable ||
+      ControllerAccessFailureKind.controllerUnavailable =>
+        true,
+      ControllerAccessFailureKind.tokenInvalid ||
+      ControllerAccessFailureKind.tlsCertificate ||
+      ControllerAccessFailureKind.unexpectedResponse =>
+        false,
+    };
   }
 
   void _handleLocalControllerError(

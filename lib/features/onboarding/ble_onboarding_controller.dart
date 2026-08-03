@@ -23,6 +23,8 @@ class BleOnboardingController extends ChangeNotifier {
     Duration rebootDelay = const Duration(seconds: 4),
     Duration reconnectRetryDelay = const Duration(seconds: 2),
     Duration readCurrentWifiSettingsTimeout = const Duration(seconds: 90),
+    Duration controllerAccessRetryDelay = const Duration(seconds: 2),
+    int maxControllerAccessAttempts = 5,
     int maxReconnectAttempts = 5,
   }) {
     _stateStore = BleOnboardingStateStore();
@@ -54,6 +56,8 @@ class BleOnboardingController extends ChangeNotifier {
       bleService: _bleService,
       onboardingStorage: onboardingStorage,
       localControllerApiClient: localControllerApiClient,
+      retryDelay: controllerAccessRetryDelay,
+      maxAttempts: maxControllerAccessAttempts,
     );
     _stateStore.addListener(notifyListeners);
   }
