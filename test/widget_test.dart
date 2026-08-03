@@ -41,6 +41,45 @@ void main() {
     expect(find.text('Готово до пошуку'), findsOneWidget);
   });
 
+  testWidgets('search button retries BLE availability when Bluetooth was off',
+      (tester) async {
+    final composition = TestAppComposition(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final bleService = FakeBleService(
+      availability: BleAvailability.bluetoothDisabled,
+    );
+    final bleOnboardingController = BleOnboardingController(
+      bleService: bleService,
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
+    );
+
+    await tester.pumpWidget(
+      AutomaticWateringApp(
+        appController: composition.appController,
+        bleOnboardingController: bleOnboardingController,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('Увімкніть Bluetooth у налаштуваннях пристрою'),
+      findsOneWidget,
+    );
+    expect(find.text('Шукати'), findsOneWidget);
+
+    bleService.availability = BleAvailability.ready;
+    await tester.tap(find.text('Шукати'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Шукаємо контролер'), findsOneWidget);
+  });
+
   testWidgets('keeps onboarding visible until controller access is complete',
       (tester) async {
     final createdAt = DateTime.utc(2026);
@@ -330,12 +369,16 @@ class FlakySettingsApiClient extends FakeSettingsApiClient {
 }
 
 class FakeBleService implements BleService {
+  FakeBleService({this.availability = BleAvailability.ready});
+
+  BleAvailability availability;
+
   @override
   Stream<List<BleDiscoveredDevice>> get discoveredDevices =>
       const Stream.empty();
 
   @override
-  Future<BleAvailability> checkAvailability() async => BleAvailability.ready;
+  Future<BleAvailability> checkAvailability() async => availability;
 
   @override
   Future<BleAvailability> requestPermissions() async => BleAvailability.ready;

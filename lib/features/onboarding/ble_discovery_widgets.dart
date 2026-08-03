@@ -32,9 +32,20 @@ class BleScanStep extends StatelessWidget {
           label: const Text('Дозволити Bluetooth'),
         ),
       BluetoothUnavailable(availability: BleAvailability.bluetoothDisabled) =>
-        const _DiscoveryStatus(
-          icon: Icon(Icons.bluetooth_disabled),
-          text: 'Увімкніть Bluetooth у налаштуваннях пристрою',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _DiscoveryStatus(
+              icon: Icon(Icons.bluetooth_disabled),
+              text: 'Увімкніть Bluetooth у налаштуваннях пристрою',
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onScan,
+              icon: const Icon(Icons.search),
+              label: const Text('Шукати'),
+            ),
+          ],
         ),
       ReadyToScan() => FilledButton.icon(
           onPressed: onScan,
