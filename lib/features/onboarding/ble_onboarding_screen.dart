@@ -81,7 +81,6 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
         BlePairingScreen(
           state: state,
           onConnect: widget.controller.connectSelectedDevice,
-          onPair: widget.controller.pairSelectedDevice,
         ),
       ReadingWifiSettings() ||
       WifiCredentialsFormReady() ||

@@ -145,14 +145,9 @@ class FlutterReactiveBleService implements BleService {
   }
 
   @override
-  Future<BleDeviceServices> pairAndDiscoverServices({
-    required BleDiscoveredDevice device,
-    required String passkey,
-  }) async {
-    if (passkey != AutomaticWateringBleConstants.pairingPasskey) {
-      throw ArgumentError('Invalid BLE pairing passkey');
-    }
-
+  Future<BleDeviceServices> pairAndDiscoverServices(
+    BleDiscoveredDevice device,
+  ) async {
     final services = await discoverServices(device.id);
     if (!services.hasAutomaticWateringService) {
       throw StateError('Expected Automatic Watering BLE service not found');

@@ -1,6 +1,5 @@
 import '../../app/fatal_app_exception.dart';
 import '../../app/onboarding_app_service.dart';
-import '../../features/ble/ble_constants.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
@@ -82,10 +81,7 @@ class BleControllerAccessFlow {
     try {
       if (!_session.isBleConnected) {
         await _bleService.reconnect(device);
-        await _bleService.pairAndDiscoverServices(
-          device: device,
-          passkey: AutomaticWateringBleConstants.pairingPasskey,
-        );
+        await _bleService.pairAndDiscoverServices(device);
         _session.isBleConnected = true;
       }
 

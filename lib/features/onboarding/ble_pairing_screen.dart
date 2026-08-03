@@ -8,13 +8,11 @@ class BlePairingScreen extends StatelessWidget {
   const BlePairingScreen({
     required this.state,
     required this.onConnect,
-    required this.onPair,
     super.key,
   });
 
   final BleOnboardingState state;
   final VoidCallback onConnect;
-  final ValueChanged<String> onPair;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +23,6 @@ class BlePairingScreen extends StatelessWidget {
         BlePairingStep(
           state: state,
           onConnect: onConnect,
-          onPair: onPair,
         ),
       ],
     );

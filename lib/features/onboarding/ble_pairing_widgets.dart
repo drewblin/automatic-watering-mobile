@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../ble/ble_constants.dart';
 import '../ble/ble_models.dart';
 import 'ble_onboarding_state.dart';
 
@@ -29,29 +28,17 @@ class BlePairingStep extends StatefulWidget {
   const BlePairingStep({
     required this.state,
     required this.onConnect,
-    required this.onPair,
     super.key,
   });
 
   final BleOnboardingState state;
   final VoidCallback onConnect;
-  final ValueChanged<String> onPair;
 
   @override
   State<BlePairingStep> createState() => _BlePairingStepState();
 }
 
 class _BlePairingStepState extends State<BlePairingStep> {
-  final _passkeyController = TextEditingController(
-    text: AutomaticWateringBleConstants.pairingPasskey,
-  );
-
-  @override
-  void dispose() {
-    _passkeyController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
@@ -65,54 +52,11 @@ class _BlePairingStepState extends State<BlePairingStep> {
       ConnectingDevice() => const _PairingStatus(
           text: 'Підключаємось до контролера',
         ),
-      AwaitingPairingPasskey() => _PasskeyForm(
-          controller: _passkeyController,
-          onPair: _pairSelectedDevice,
-        ),
       PairingInProgress() => const _PairingStatus(
           text: 'Виконуємо сполучення',
         ),
       _ => const SizedBox.shrink(),
     };
-  }
-
-  void _pairSelectedDevice() {
-    widget.onPair(_passkeyController.text.trim());
-  }
-}
-
-class _PasskeyForm extends StatelessWidget {
-  const _PasskeyForm({
-    required this.controller,
-    required this.onPair,
-  });
-
-  final TextEditingController controller;
-  final VoidCallback onPair;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          decoration: const InputDecoration(
-            labelText: 'Код сполучення',
-            counterText: '',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: onPair,
-          icon: const Icon(Icons.pin),
-          label: const Text('Виконати сполучення'),
-        ),
-      ],
-    );
   }
 }
 

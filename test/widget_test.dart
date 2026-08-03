@@ -396,10 +396,9 @@ class FakeBleService implements BleService {
   Future<void> reconnect(BleDiscoveredDevice device) async {}
 
   @override
-  Future<BleDeviceServices> pairAndDiscoverServices({
-    required BleDiscoveredDevice device,
-    required String passkey,
-  }) async {
+  Future<BleDeviceServices> pairAndDiscoverServices(
+    BleDiscoveredDevice device,
+  ) async {
     return BleDeviceServices(
       deviceId: device.id,
       hasAutomaticWateringService: true,

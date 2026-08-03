@@ -20,6 +20,7 @@ class BleOnboardingController extends ChangeNotifier {
     required LocalControllerApiClient localControllerApiClient,
     Duration rebootDelay = const Duration(seconds: 3),
     Duration reconnectRetryDelay = const Duration(seconds: 2),
+    Duration readCurrentWifiSettingsTimeout = const Duration(seconds: 90),
     int maxReconnectAttempts = 5,
   }) {
     _stateStore = BleOnboardingStateStore();
@@ -41,6 +42,7 @@ class BleOnboardingController extends ChangeNotifier {
       bleService: _bleService,
       rebootDelay: rebootDelay,
       reconnectRetryDelay: reconnectRetryDelay,
+      readCurrentSettingsTimeout: readCurrentWifiSettingsTimeout,
       maxReconnectAttempts: maxReconnectAttempts,
     );
     _access = BleControllerAccessFlow(
@@ -73,10 +75,8 @@ class BleOnboardingController extends ChangeNotifier {
     _discovery.selectDevice(device);
   }
 
-  Future<void> connectSelectedDevice() => _pairing.connectSelectedDevice();
-
-  Future<void> pairSelectedDevice(String passkey) async {
-    final device = await _pairing.pairSelectedDevice(passkey);
+  Future<void> connectSelectedDevice() async {
+    final device = await _pairing.connectSelectedDevice();
     if (device == null) {
       return;
     }

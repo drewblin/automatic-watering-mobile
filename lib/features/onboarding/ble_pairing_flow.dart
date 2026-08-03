@@ -1,4 +1,3 @@
-import '../../features/ble/ble_constants.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import 'ble_onboarding_errors.dart';
@@ -19,10 +18,10 @@ class BlePairingFlow {
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
 
-  Future<void> connectSelectedDevice() async {
+  Future<BleDiscoveredDevice?> connectSelectedDevice() async {
     final state = _stateStore.state;
     if (state is! DeviceSelected) {
-      return;
+      return null;
     }
     final device = state.device;
 
@@ -32,13 +31,15 @@ class BlePairingFlow {
 
     try {
       await _bleService.connect(device);
-      _session.isBleConnected = true;
       _stateStore.setState(
-        AwaitingPairingPasskey(
-          foundDevices: _session.devices,
-          device: device,
-        ),
+        PairingInProgress(foundDevices: _session.devices, device: device),
       );
+      final services = await _bleService.pairAndDiscoverServices(device);
+      if (!services.hasAutomaticWateringService) {
+        throw StateError('Automatic Watering BLE service was not discovered');
+      }
+      _session.isBleConnected = true;
+      return device;
     } catch (error) {
       _session.isBleConnected = false;
       _stateStore.setState(
@@ -49,52 +50,6 @@ class BlePairingFlow {
             'Не вдалося підключитися до контролера.',
             error,
           ),
-        ),
-      );
-    }
-  }
-
-  Future<BleDiscoveredDevice?> pairSelectedDevice(String passkey) async {
-    final state = _stateStore.state;
-    if (state is! AwaitingPairingPasskey) {
-      return null;
-    }
-    final device = state.device;
-
-    if (passkey != AutomaticWateringBleConstants.pairingPasskey) {
-      _stateStore.setState(
-        AwaitingPairingPasskey(
-          foundDevices: _session.devices,
-          device: device,
-          error: bleOnboardingBleError(
-            'Неправильний код сполучення.',
-            ArgumentError('Invalid BLE pairing passkey'),
-          ),
-        ),
-      );
-      return null;
-    }
-
-    _stateStore.setState(
-      PairingInProgress(foundDevices: _session.devices, device: device),
-    );
-
-    try {
-      final services = await _bleService.pairAndDiscoverServices(
-        device: device,
-        passkey: passkey,
-      );
-      if (!services.hasAutomaticWateringService) {
-        throw StateError('Automatic Watering BLE service was not discovered');
-      }
-      _session.isBleConnected = true;
-      return device;
-    } catch (error) {
-      _stateStore.setState(
-        AwaitingPairingPasskey(
-          foundDevices: _session.devices,
-          device: device,
-          error: bleOnboardingBleError('Сполучення не виконано.', error),
         ),
       );
       return null;

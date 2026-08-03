@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_test_composition.dart';
@@ -40,15 +42,12 @@ void main() {
 
     controller.selectDevice(device);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
 
     expect(controller.state, isA<WifiCredentialsFormReady>());
     expect(storage.activeHub, isNull);
   });
 
-  test('incorrect passkey sets an error and does not save a hub', () async {
+  test('failed automatic BLE service discovery does not save a hub', () async {
     final storage = InMemoryWateringHubStorage();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
@@ -58,7 +57,9 @@ void main() {
     final appController = composition.appController;
     await appController.initialize();
     final controller = BleOnboardingController(
-      bleService: FakeBleService(),
+      bleService: FakeBleService(
+        hasAutomaticWateringService: false,
+      ),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
     );
@@ -73,12 +74,11 @@ void main() {
       ),
     );
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice('000000');
 
-    expect(controller.state, isA<AwaitingPairingPasskey>());
+    expect(controller.state, isA<DeviceSelected>());
     expect(
       controller.state.bleError?.message,
-      'Неправильний код сполучення.',
+      'Не вдалося підключитися до контролера.',
     );
     expect(storage.activeHub, isNull);
   });
@@ -122,9 +122,6 @@ void main() {
 
     controller.selectDevice(newDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
     await controller.saveWifiSettings(
       const WifiCredentials(ssid: 'Garden', password: 'secure123'),
     );
@@ -163,13 +160,43 @@ void main() {
 
     controller.selectDevice(testDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
 
     expect(controller.state.wifiCredentials.ssid, 'Greenhouse');
     expect(controller.state.wifiCredentials.password, isEmpty);
     expect(controller.state, isA<WifiCredentialsFormReady>());
+  });
+
+  test('reading Wi-Fi settings times out and returns to the form', () async {
+    final composition = TestAppComposition(
+      wateringHubStorage: InMemoryWateringHubStorage(),
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      controllerSettingsRepository: testSettingsRepository(),
+    );
+    final appController = composition.appController;
+    await appController.initialize();
+    final bleService = FakeBleService();
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+      readCurrentWifiSettingsTimeout: const Duration(milliseconds: 1),
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+
+    bleService.hangWifiSettingsRead = true;
+    await controller.readCurrentWifiSettings();
+
+    expect(controller.state, isA<WifiCredentialsFormReady>());
+    expect(
+      controller.state.wifiError?.operation,
+      WifiProvisioningOperation.readCurrentSettings,
+    );
+    expect(
+      controller.state.wifiError?.technicalReason,
+      contains('TimeoutException'),
+    );
   });
 
   test('Wi-Fi validation blocks invalid credentials without saving', () async {
@@ -189,9 +216,6 @@ void main() {
 
     controller.selectDevice(testDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
     await controller.saveWifiSettings(
       const WifiCredentials(ssid: 'Garden', password: 'short'),
     );
@@ -222,9 +246,6 @@ void main() {
 
     controller.selectDevice(testDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
     await controller.saveWifiSettings(
       const WifiCredentials(ssid: 'Garden', password: 'secure123'),
     );
@@ -262,9 +283,6 @@ void main() {
 
     controller.selectDevice(testDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
     await controller.saveWifiSettings(
       const WifiCredentials(ssid: 'Garden', password: 'secure123'),
     );
@@ -314,9 +332,6 @@ void main() {
 
     controller.selectDevice(testDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
     await controller.saveWifiSettings(
       const WifiCredentials(ssid: 'Garden', password: 'secure123'),
     );
@@ -352,9 +367,6 @@ void main() {
 
     controller.selectDevice(testDevice);
     await controller.connectSelectedDevice();
-    await controller.pairSelectedDevice(
-      AutomaticWateringBleConstants.pairingPasskey,
-    );
     await controller.saveWifiSettings(
       const WifiCredentials(ssid: 'Garden', password: 'secure123'),
     );
@@ -432,15 +444,18 @@ class FakeBleService implements BleService {
     this.currentWifi = const WifiCredentials(ssid: '', password: ''),
     this.wifiIpAddress = const ControllerIpAddress('192.168.1.42'),
     this.apiAccessToken = const ControllerApiAccessToken(validToken),
+    this.hasAutomaticWateringService = true,
   });
 
   final WifiCredentials currentWifi;
   final ControllerIpAddress wifiIpAddress;
   final ControllerApiAccessToken apiAccessToken;
+  final bool hasAutomaticWateringService;
   WifiCredentials? savedWifiCredentials;
   int disconnectCalls = 0;
   int reconnectCalls = 0;
   int readApiAccessTokenCalls = 0;
+  bool hangWifiSettingsRead = false;
 
   @override
   Stream<List<BleDiscoveredDevice>> get discoveredDevices =>
@@ -467,13 +482,12 @@ class FakeBleService implements BleService {
   }
 
   @override
-  Future<BleDeviceServices> pairAndDiscoverServices({
-    required BleDiscoveredDevice device,
-    required String passkey,
-  }) async {
+  Future<BleDeviceServices> pairAndDiscoverServices(
+    BleDiscoveredDevice device,
+  ) async {
     return BleDeviceServices(
       deviceId: device.id,
-      hasAutomaticWateringService: true,
+      hasAutomaticWateringService: hasAutomaticWateringService,
       discoveredCharacteristicUuids:
           AutomaticWateringBleConstants.expectedCharacteristicUuids,
     );
@@ -486,6 +500,9 @@ class FakeBleService implements BleService {
 
   @override
   Future<WifiCredentials> readWifiSettings(String deviceId) async {
+    if (hangWifiSettingsRead) {
+      return Completer<WifiCredentials>().future;
+    }
     return currentWifi.copyWith(password: '');
   }
 

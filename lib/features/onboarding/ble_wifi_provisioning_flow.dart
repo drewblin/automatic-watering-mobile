@@ -1,4 +1,5 @@
-import '../../features/ble/ble_constants.dart';
+import 'dart:async';
+
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import 'ble_onboarding_errors.dart';
@@ -15,12 +16,14 @@ class BleWifiProvisioningFlow {
     required Duration rebootDelay,
     required Duration reconnectRetryDelay,
     required int maxReconnectAttempts,
+    Duration readCurrentSettingsTimeout = const Duration(seconds: 90),
   })  : _session = session,
         _stateStore = stateStore,
         _bleService = bleService,
         _rebootDelay = rebootDelay,
         _reconnectRetryDelay = reconnectRetryDelay,
-        _maxReconnectAttempts = maxReconnectAttempts;
+        _maxReconnectAttempts = maxReconnectAttempts,
+        _readCurrentSettingsTimeout = readCurrentSettingsTimeout;
 
   final BleOnboardingSession _session;
   final BleOnboardingStateStore _stateStore;
@@ -28,6 +31,7 @@ class BleWifiProvisioningFlow {
   final Duration _rebootDelay;
   final Duration _reconnectRetryDelay;
   final int _maxReconnectAttempts;
+  final Duration _readCurrentSettingsTimeout;
 
   void updateWifiCredentials(WifiCredentials credentials) {
     final state = _stateStore.state;
@@ -80,11 +84,16 @@ class BleWifiProvisioningFlow {
     _stateStore.setState(ReadingWifiSettings(device: device));
 
     try {
-      if (!_session.isBleConnected) {
-        await _bleService.reconnect(device);
-        _session.isBleConnected = true;
-      }
-      final credentials = await _bleService.readWifiSettings(device.id);
+      final credentials = await _readCurrentWifiSettings(device).timeout(
+        _readCurrentSettingsTimeout,
+        onTimeout: () {
+          throw TimeoutException(
+            'Timed out reading controller Wi-Fi settings',
+            _readCurrentSettingsTimeout,
+          );
+        },
+      );
+      _session.isBleConnected = true;
       _stateStore.setState(
         WifiCredentialsFormReady(
           device: device,
@@ -105,6 +114,15 @@ class BleWifiProvisioningFlow {
         ),
       );
     }
+  }
+
+  Future<WifiCredentials> _readCurrentWifiSettings(
+    BleDiscoveredDevice device,
+  ) async {
+    if (!_session.isBleConnected) {
+      await _bleService.reconnect(device);
+    }
+    return _bleService.readWifiSettings(device.id);
   }
 
   Future<void> saveWifiSettings(WifiCredentials credentials) async {
@@ -198,10 +216,7 @@ class BleWifiProvisioningFlow {
       );
       try {
         await _bleService.reconnect(device);
-        await _bleService.pairAndDiscoverServices(
-          device: device,
-          passkey: AutomaticWateringBleConstants.pairingPasskey,
-        );
+        await _bleService.pairAndDiscoverServices(device);
         _session.isBleConnected = true;
         _stateStore.setState(
           AccessSetupReady(

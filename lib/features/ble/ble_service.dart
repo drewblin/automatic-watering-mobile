@@ -16,10 +16,7 @@ abstract interface class BleService {
 
   Future<void> reconnect(BleDiscoveredDevice device);
 
-  Future<BleDeviceServices> pairAndDiscoverServices({
-    required BleDiscoveredDevice device,
-    required String passkey,
-  });
+  Future<BleDeviceServices> pairAndDiscoverServices(BleDiscoveredDevice device);
 
   Future<void> disconnect(String deviceId);
 

@@ -21,7 +21,6 @@ enum BleCharacteristicProperty {
 
 abstract final class AutomaticWateringBleConstants {
   static const deviceName = 'Automatic Watering Hub';
-  static const pairingPasskey = '482917';
 
   static const serviceUuid = '4d42b2d0-35ba-4b70-b8a2-d1cf01e904c1';
 
