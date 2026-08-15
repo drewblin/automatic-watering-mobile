@@ -36,14 +36,12 @@ class BleDiscoveredDevice {
 class BleConnectionError {
   const BleConnectionError({
     required this.message,
-    required this.technicalReason,
   });
 
   final String message;
-  final String technicalReason;
 
   @override
-  String toString() => '$message ($technicalReason)';
+  String toString() => message;
 }
 
 @immutable

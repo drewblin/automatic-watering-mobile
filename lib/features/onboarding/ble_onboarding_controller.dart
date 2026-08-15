@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../app/onboarding_app_service.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
+import '../../features/local_controller/diagnostics_log.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
 import 'ble_controller_access_flow.dart';
 import 'ble_discovery_flow.dart';
@@ -20,6 +21,7 @@ class BleOnboardingController extends ChangeNotifier {
     required PhoneWifiService phoneWifiService,
     required OnboardingAppService onboardingStorage,
     required LocalControllerApiClient localControllerApiClient,
+    required DiagnosticsLog diagnosticsLog,
     Duration rebootDelay = const Duration(seconds: 4),
     Duration reconnectRetryDelay = const Duration(seconds: 2),
     Duration readCurrentWifiSettingsTimeout = const Duration(seconds: 90),
@@ -34,17 +36,20 @@ class BleOnboardingController extends ChangeNotifier {
       session: _session,
       stateStore: _stateStore,
       bleService: _bleService,
+      diagnosticsLog: diagnosticsLog,
     );
     _pairing = BlePairingFlow(
       session: _session,
       stateStore: _stateStore,
       bleService: _bleService,
+      diagnosticsLog: diagnosticsLog,
     );
     _wifi = BleWifiProvisioningFlow(
       session: _session,
       stateStore: _stateStore,
       bleService: _bleService,
       phoneWifiService: phoneWifiService,
+      diagnosticsLog: diagnosticsLog,
       rebootDelay: rebootDelay,
       reconnectRetryDelay: reconnectRetryDelay,
       readCurrentSettingsTimeout: readCurrentWifiSettingsTimeout,
@@ -56,6 +61,7 @@ class BleOnboardingController extends ChangeNotifier {
       bleService: _bleService,
       onboardingStorage: onboardingStorage,
       localControllerApiClient: localControllerApiClient,
+      diagnosticsLog: diagnosticsLog,
       retryDelay: controllerAccessRetryDelay,
       maxAttempts: maxControllerAccessAttempts,
     );

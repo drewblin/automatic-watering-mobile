@@ -140,11 +140,9 @@ class SaveWifiSettingsResponse {
 class WifiProvisioningError {
   const WifiProvisioningError({
     required this.message,
-    required this.technicalReason,
     required this.operation,
   });
 
   final String message;
-  final String technicalReason;
   final WifiProvisioningOperation operation;
 }

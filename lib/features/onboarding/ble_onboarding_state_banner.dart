@@ -33,13 +33,6 @@ class BleOnboardingStateBanner extends StatelessWidget {
                   Text(title, style: textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(message),
-                  if (state.bleError != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      state.bleError!.technicalReason,
-                      style: textTheme.bodySmall,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -168,14 +161,14 @@ class BleOnboardingStateBanner extends StatelessWidget {
           'Перевіряємо локальний HTTPS API контролера за адресою $ipAddress.',
           Icons.https,
         ),
-      ControllerIpPending(:final error) => (
+      ControllerIpPending(:final message) => (
           'IP-адреса очікується',
-          error.message,
+          message,
           Icons.hourglass_empty,
         ),
-      ControllerAccessFailed(:final error) => (
+      ControllerAccessFailed(:final message) => (
           'Доступ не перевірено',
-          error.message,
+          message,
           Icons.error_outline,
         ),
       ControllerAccessReady(:final ipAddress) => (

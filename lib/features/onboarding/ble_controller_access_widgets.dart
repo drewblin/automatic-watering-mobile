@@ -75,13 +75,6 @@ class _AccessDetails extends StatelessWidget {
           label: 'HTTPS API',
           value: _httpsStatus,
         ),
-        if (state.controllerAccessError != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            state.controllerAccessError!.technicalReason,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
       ],
     );
   }
@@ -91,19 +84,7 @@ class _AccessDetails extends StatelessWidget {
       CheckingLocalHttpsAccess() => 'Перевіряємо локальний доступ',
       ControllerAccessReady() => 'Перевірено',
       ControllerIpPending() => 'Очікує IP-адресу Wi-Fi',
-      ControllerAccessFailed(:final error) => switch (error.kind) {
-          ControllerAccessFailureKind.tlsCertificate =>
-            'Помилка TLS/fingerprint',
-          ControllerAccessFailureKind.tokenInvalid => 'Помилка 401',
-          ControllerAccessFailureKind.networkUnavailable ||
-          ControllerAccessFailureKind.timeout =>
-            'Timeout або мережа недоступна',
-          ControllerAccessFailureKind.controllerUnavailable =>
-            'Контролер недоступний',
-          ControllerAccessFailureKind.ipPending => 'Очікує IP-адресу Wi-Fi',
-          ControllerAccessFailureKind.unexpectedResponse =>
-            'Неочікувана відповідь',
-        },
+      ControllerAccessFailed(:final message) => message,
       _ => 'Ще не перевірено',
     };
   }

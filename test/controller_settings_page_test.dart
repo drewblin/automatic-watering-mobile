@@ -134,10 +134,7 @@ void main() {
         ),
       );
     final client = RecordingSettingsApiClient(
-      putException: const LocalControllerApiException(
-        LocalControllerApiErrorKind.unexpectedResponse,
-        'bad request',
-      ),
+      putException: const LocalControllerApiException(),
     );
     final controller = ControllerSettingsSaveController(
       stateStore: stateStore,

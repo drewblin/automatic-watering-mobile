@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
+import '../../features/local_controller/diagnostics_log.dart';
 import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
@@ -15,6 +16,7 @@ class BleWifiProvisioningFlow {
     required BleOnboardingStateStore stateStore,
     required BleService bleService,
     required PhoneWifiService phoneWifiService,
+    required DiagnosticsLog diagnosticsLog,
     required Duration rebootDelay,
     required Duration reconnectRetryDelay,
     required int maxReconnectAttempts,
@@ -23,6 +25,7 @@ class BleWifiProvisioningFlow {
         _stateStore = stateStore,
         _bleService = bleService,
         _phoneWifiService = phoneWifiService,
+        _diagnosticsLog = diagnosticsLog,
         _rebootDelay = rebootDelay,
         _reconnectRetryDelay = reconnectRetryDelay,
         _maxReconnectAttempts = maxReconnectAttempts,
@@ -32,6 +35,7 @@ class BleWifiProvisioningFlow {
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
   final PhoneWifiService _phoneWifiService;
+  final DiagnosticsLog _diagnosticsLog;
   final Duration _rebootDelay;
   final Duration _reconnectRetryDelay;
   final int _maxReconnectAttempts;
@@ -90,6 +94,7 @@ class BleWifiProvisioningFlow {
                 'Не вдалося прочитати Wi-Fi мережі телефону. Перевірте дозволи Wi-Fi/локації і що геолокацію увімкнено.',
             operation: WifiProvisioningOperation.phoneWifiAutofill,
             error: error,
+            diagnosticsLog: _diagnosticsLog,
           ),
         ),
       );
@@ -141,6 +146,7 @@ class BleWifiProvisioningFlow {
             message: 'Не вдалося прочитати поточну Wi-Fi мережу контролера.',
             operation: WifiProvisioningOperation.readCurrentSettings,
             error: error,
+            diagnosticsLog: _diagnosticsLog,
           ),
         ),
       );
@@ -167,6 +173,11 @@ class BleWifiProvisioningFlow {
     final publicCredentials = normalized.sanitizedForState;
     final validationErrors = normalized.validate();
     if (validationErrors.isNotEmpty) {
+      recordDiagnosticsIssue(
+        diagnosticsLog: _diagnosticsLog,
+        message: 'Перевірте поля Wi-Fi.',
+        details: 'Validation failed',
+      );
       _stateStore.setState(
         WifiCredentialsFormReady(
           device: device,
@@ -175,7 +186,6 @@ class BleWifiProvisioningFlow {
           phoneWifiNetworks: state.phoneWifiNetworks,
           error: const WifiProvisioningError(
             message: 'Перевірте поля Wi-Fi.',
-            technicalReason: 'Validation failed',
             operation: WifiProvisioningOperation.validateInput,
           ),
         ),
@@ -205,6 +215,7 @@ class BleWifiProvisioningFlow {
             message: 'Контролер не прийняв Wi-Fi налаштування.',
             operation: WifiProvisioningOperation.saveSettings,
             error: error,
+            diagnosticsLog: _diagnosticsLog,
           ),
         ),
       );
@@ -309,6 +320,7 @@ class BleWifiProvisioningFlow {
           message: 'Не вдалося повторно підключитися до контролера через BLE.',
           operation: WifiProvisioningOperation.reconnectBle,
           error: lastError ?? StateError('BLE reconnect failed'),
+          diagnosticsLog: _diagnosticsLog,
         ),
       ),
     );

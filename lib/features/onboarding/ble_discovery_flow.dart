@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
+import '../../features/local_controller/diagnostics_log.dart';
 import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
@@ -12,17 +13,20 @@ class BleDiscoveryFlow {
     required BleOnboardingSession session,
     required BleOnboardingStateStore stateStore,
     required BleService bleService,
+    required DiagnosticsLog diagnosticsLog,
   })  : _session = session,
         _stateStore = stateStore,
-        _bleService = bleService {
+        _bleService = bleService,
+        _diagnosticsLog = diagnosticsLog {
     _devicesSubscription = _bleService.discoveredDevices.listen(
       _syncDiscoveredDevices,
       onError: (Object error) {
         _stateStore.setState(
           ReadyToScan(
             error: bleOnboardingBleError(
-              'Не вдалося виконати BLE-пошук.',
-              error,
+              message: 'Не вдалося виконати BLE-пошук.',
+              error: error,
+              diagnosticsLog: _diagnosticsLog,
             ),
           ),
         );
@@ -33,6 +37,7 @@ class BleDiscoveryFlow {
   final BleOnboardingSession _session;
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
+  final DiagnosticsLog _diagnosticsLog;
   StreamSubscription<List<BleDiscoveredDevice>>? _devicesSubscription;
 
   Future<void> checkAvailability() async {
@@ -73,8 +78,9 @@ class BleDiscoveryFlow {
       _stateStore.setState(
         ReadyToScan(
           error: bleOnboardingBleError(
-            'Не вдалося запустити BLE-пошук.',
-            error,
+            message: 'Не вдалося запустити BLE-пошук.',
+            error: error,
+            diagnosticsLog: _diagnosticsLog,
           ),
         ),
       );

@@ -2,9 +2,9 @@ import '../../app/fatal_app_exception.dart';
 import '../../app/onboarding_app_service.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
+import '../../features/local_controller/diagnostics_log.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
 import '../../features/watering_hubs/watering_hub.dart';
-import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
 import 'ble_onboarding_state_store.dart';
@@ -17,6 +17,7 @@ class BleControllerAccessFlow {
     required BleService bleService,
     required OnboardingAppService onboardingStorage,
     required LocalControllerApiClient localControllerApiClient,
+    required DiagnosticsLog diagnosticsLog,
     Duration retryDelay = const Duration(seconds: 2),
     int maxAttempts = 5,
   })  : _session = session,
@@ -24,6 +25,7 @@ class BleControllerAccessFlow {
         _bleService = bleService,
         _onboardingStorage = onboardingStorage,
         _localControllerApiClient = localControllerApiClient,
+        _diagnosticsLog = diagnosticsLog,
         _retryDelay = retryDelay,
         _maxAttempts = maxAttempts;
 
@@ -32,6 +34,7 @@ class BleControllerAccessFlow {
   final BleService _bleService;
   final OnboardingAppService _onboardingStorage;
   final LocalControllerApiClient _localControllerApiClient;
+  final DiagnosticsLog _diagnosticsLog;
   final Duration _retryDelay;
   final int _maxAttempts;
 
@@ -78,7 +81,7 @@ class BleControllerAccessFlow {
     required WifiCredentials credentials,
   }) async {
     Object? lastUnexpectedError;
-    ControllerAccessError? lastAccessError;
+    String? lastIpPendingMessage;
 
     for (var attempt = 1; attempt <= _maxAttempts; ++attempt) {
       _stateStore.setState(
@@ -105,11 +108,12 @@ class BleControllerAccessFlow {
         );
 
         if (ipAddress.isPending) {
-          lastAccessError = const ControllerAccessError(
-            kind: ControllerAccessFailureKind.ipPending,
-            message:
-                'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.',
-            technicalReason: 'BLE WifiIpAddress returned 0.0.0.0',
+          lastIpPendingMessage =
+              'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.';
+          recordDiagnosticsIssue(
+            diagnosticsLog: _diagnosticsLog,
+            message: lastIpPendingMessage,
+            details: 'BLE WifiIpAddress returned 0.0.0.0',
           );
           if (attempt < _maxAttempts) {
             await Future<void>.delayed(_retryDelay);
@@ -119,7 +123,7 @@ class BleControllerAccessFlow {
             ControllerIpPending(
               device: device,
               credentials: credentials,
-              error: lastAccessError,
+              message: lastIpPendingMessage,
             ),
           );
           return;
@@ -165,13 +169,7 @@ class BleControllerAccessFlow {
       } on FatalAppException {
         rethrow;
       } on LocalControllerApiException catch (error) {
-        final kind = controllerAccessFailureKindFrom(error.kind);
-        lastAccessError = ControllerAccessError(
-          kind: kind,
-          message: controllerAccessMessage(kind),
-          technicalReason: error.message,
-        );
-        if (_shouldRetryAccessFailure(kind) && attempt < _maxAttempts) {
+        if (attempt < _maxAttempts) {
           await Future<void>.delayed(_retryDelay);
           continue;
         }
@@ -188,46 +186,31 @@ class BleControllerAccessFlow {
       }
     }
 
-    if (lastAccessError?.kind == ControllerAccessFailureKind.ipPending) {
+    if (lastIpPendingMessage != null) {
       _stateStore.setState(
         ControllerIpPending(
           device: device,
           credentials: credentials,
-          error: lastAccessError!,
+          message: lastIpPendingMessage,
         ),
       );
       return;
     }
 
+    final error = lastUnexpectedError ?? StateError('Controller access failed');
+    recordDiagnosticsIssue(
+      diagnosticsLog: _diagnosticsLog,
+      message: 'Не вдалося прочитати IP-адресу або токен доступу через BLE.',
+      error: error,
+    );
     _stateStore.setState(
       ControllerAccessFailed(
         device: device,
         credentials: credentials,
         ipAddress: _stateStore.state.controllerIpAddress,
-        error: ControllerAccessError(
-          kind: ControllerAccessFailureKind.unexpectedResponse,
-          message:
-              'Не вдалося прочитати IP-адресу або токен доступу через BLE.',
-          technicalReason: safeOnboardingTechnicalReason(
-            lastUnexpectedError ?? StateError('Controller access failed'),
-          ),
-        ),
+        message: 'Не вдалося прочитати IP-адресу або токен доступу через BLE.',
       ),
     );
-  }
-
-  bool _shouldRetryAccessFailure(ControllerAccessFailureKind kind) {
-    return switch (kind) {
-      ControllerAccessFailureKind.ipPending ||
-      ControllerAccessFailureKind.timeout ||
-      ControllerAccessFailureKind.networkUnavailable ||
-      ControllerAccessFailureKind.controllerUnavailable =>
-        true,
-      ControllerAccessFailureKind.tokenInvalid ||
-      ControllerAccessFailureKind.tlsCertificate ||
-      ControllerAccessFailureKind.unexpectedResponse =>
-        false,
-    };
   }
 
   void _handleLocalControllerError(
@@ -235,17 +218,12 @@ class BleControllerAccessFlow {
     WifiCredentials credentials,
     LocalControllerApiException error,
   ) {
-    final kind = controllerAccessFailureKindFrom(error.kind);
     _stateStore.setState(
       ControllerAccessFailed(
         device: device,
         credentials: credentials,
         ipAddress: _stateStore.state.controllerIpAddress,
-        error: ControllerAccessError(
-          kind: kind,
-          message: controllerAccessMessage(kind),
-          technicalReason: error.message,
-        ),
+        message: 'Помилка комунікації з контролером.',
       ),
     );
   }

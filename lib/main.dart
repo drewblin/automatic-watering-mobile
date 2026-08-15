@@ -14,6 +14,7 @@ import 'features/ble/flutter_reactive_ble_service.dart';
 import 'features/controller_settings/controller_settings_repository.dart';
 import 'features/controller_settings/controller_settings_save_controller.dart';
 import 'features/home/home_dashboard_controller.dart';
+import 'features/local_controller/diagnostics_log.dart';
 import 'features/local_controller/local_controller_api_client.dart';
 import 'features/onboarding/ble_onboarding_controller.dart';
 import 'features/onboarding/phone_wifi_service.dart';
@@ -42,7 +43,11 @@ Future<void> main() async {
       const tokenStorage = SecureWateringHubTokenStorage(
         FlutterSecureStorage(),
       );
-      final localControllerApiClient = HttpLocalControllerApiClient();
+      final diagnosticsLog = InMemoryDiagnosticsLog();
+      final localControllerApiClient = HttpLocalControllerApiClient(
+        httpClient: HttpLocalControllerApiClient.createPinnedHttpClient(),
+        diagnosticsLog: diagnosticsLog,
+      );
       final controllerSettingsRepository = ControllerSettingsRepository(
         apiClient: localControllerApiClient,
       );
@@ -76,6 +81,7 @@ Future<void> main() async {
         phoneWifiService: PluginPhoneWifiService(),
         onboardingStorage: onboardingService,
         localControllerApiClient: localControllerApiClient,
+        diagnosticsLog: diagnosticsLog,
       );
 
       runApp(

@@ -111,9 +111,6 @@ class ControllerSettingsSaveController {
         return true;
       } on LocalControllerApiException catch (error) {
         lastError = error;
-        if (error.kind == LocalControllerApiErrorKind.tokenInvalid) {
-          break;
-        }
         await Future<void>.delayed(_reconnectAttemptDelay);
       }
     }
@@ -136,24 +133,9 @@ class ControllerSettingsSaveController {
   }
 }
 
-String _saveErrorMessage(LocalControllerApiException error) {
-  return switch (error.kind) {
-    LocalControllerApiErrorKind.tokenInvalid =>
-      'Контролер відхилив токен доступу. Потрібне повторне підключення.',
-    LocalControllerApiErrorKind.controllerUnavailable =>
-      'Контролер тимчасово недоступний. Налаштування не збережено.',
-    LocalControllerApiErrorKind.networkUnavailable =>
-      'Немає зʼєднання з контролером. Налаштування не збережено.',
-    LocalControllerApiErrorKind.tlsCertificate =>
-      'Не вдалося перевірити HTTPS-сертифікат контролера.',
-    LocalControllerApiErrorKind.unexpectedResponse => error.message,
-  };
-}
+String _saveErrorMessage(LocalControllerApiException error) =>
+    'Помилка комунікації з контролером. Налаштування не збережено.';
 
 String _reconnectErrorMessage(Object? error) {
-  if (error is LocalControllerApiException &&
-      error.kind == LocalControllerApiErrorKind.tokenInvalid) {
-    return 'Контролер відхилив токен доступу після перезавантаження.';
-  }
   return 'Не вдалося відновити зʼєднання з контролером. Спробуйте ще раз.';
 }

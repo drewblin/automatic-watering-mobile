@@ -171,10 +171,7 @@ class HomeDashboardController extends ChangeNotifier {
     return rawMetrics.map((metric) {
       final deviceObjectId = _deviceObjectIdForMetric(metric, deviceObjects);
       if (deviceObjectId == null) {
-        throw const LocalControllerApiException(
-          LocalControllerApiErrorKind.unexpectedResponse,
-          'Metric does not match configured device object',
-        );
+        throw const LocalControllerApiException();
       }
       return SensorMetric.fromControllerMetric(
         metric: metric,
@@ -219,49 +216,9 @@ class HomeDashboardController extends ChangeNotifier {
   }
 }
 
-String _refreshErrorFor(LocalControllerApiException error) {
-  return switch (error.kind) {
-    LocalControllerApiErrorKind.tokenInvalid =>
-      'Контролер відхилив токен доступу. Потрібне повторне підключення.',
-    LocalControllerApiErrorKind.controllerUnavailable =>
-      'Контролер тимчасово недоступний.',
-    LocalControllerApiErrorKind.networkUnavailable =>
-      'Не вдалося отримати стан. Перевірте зʼєднання з контролером.',
-    LocalControllerApiErrorKind.tlsCertificate =>
-      'Не вдалося перевірити HTTPS-сертифікат контролера.',
-    LocalControllerApiErrorKind.unexpectedResponse =>
-      _unexpectedRefreshErrorFor(error.message),
-  };
-}
+String _refreshErrorFor(LocalControllerApiException _) =>
+    'Помилка комунікації з контролером.';
 
-String _unexpectedRefreshErrorFor(String reason) {
-  if (reason == 'Metric does not match configured device object') {
-    return 'Контролер повернув показник для пристрою, якого немає в актуальних налаштуваннях.';
-  }
-  if (reason.startsWith('помилка, http код відповіді - ')) {
-    return 'Не вдалося отримати стан: $reason.';
-  }
-  if (reason.startsWith('Metrics ')) {
-    return 'Контролер повернув неочікуваний формат показників: $reason.';
-  }
-  return 'Контролер повернув неочікувану відповідь: $reason.';
-}
-
-String _manualValveErrorFor(LocalControllerApiException error) {
-  if (error.kind == LocalControllerApiErrorKind.unexpectedResponse &&
-      error.message == 'Controller resource not found') {
-    return 'Клапан не знайдено на контролері.';
-  }
-  return switch (error.kind) {
-    LocalControllerApiErrorKind.tokenInvalid =>
-      'Контролер відхилив токен доступу. Потрібне повторне підключення.',
-    LocalControllerApiErrorKind.controllerUnavailable =>
-      'Контролер тимчасово недоступний.',
-    LocalControllerApiErrorKind.networkUnavailable =>
-      'Не вдалося відкрити клапан. Перевірте зʼєднання з контролером.',
-    LocalControllerApiErrorKind.tlsCertificate =>
-      'Не вдалося перевірити HTTPS-сертифікат контролера.',
-    LocalControllerApiErrorKind.unexpectedResponse =>
-      'Контролер повернув неочікувану відповідь.',
-  };
+String _manualValveErrorFor(LocalControllerApiException _) {
+  return 'Помилка комунікації з контролером.';
 }

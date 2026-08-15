@@ -9,6 +9,7 @@ import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
+import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
@@ -34,6 +35,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
     final device = const BleDiscoveredDevice(
       id: 'AA:BB:CC',
@@ -66,6 +68,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     controller.selectDevice(
@@ -114,6 +117,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
     );
@@ -162,6 +166,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     controller.selectDevice(testDevice);
@@ -194,6 +199,7 @@ void main() {
       ),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     controller.selectDevice(testDevice);
@@ -218,11 +224,13 @@ void main() {
     final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService();
+    final diagnosticsLog = InMemoryDiagnosticsLog();
     final controller = BleOnboardingController(
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: diagnosticsLog,
       readCurrentWifiSettingsTimeout: const Duration(milliseconds: 1),
     );
 
@@ -238,7 +246,7 @@ void main() {
       WifiProvisioningOperation.readCurrentSettings,
     );
     expect(
-      controller.state.wifiError?.technicalReason,
+      diagnosticsLog.entries.single.details,
       contains('TimeoutException'),
     );
   });
@@ -257,6 +265,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     controller.selectDevice(testDevice);
@@ -286,6 +295,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
     );
@@ -323,6 +333,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     controller.selectDevice(testDevice);
@@ -350,6 +361,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
       maxReconnectAttempts: 1,
@@ -387,6 +399,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
     );
@@ -426,6 +439,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
       maxControllerAccessAttempts: 1,
@@ -477,6 +491,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
       maxControllerAccessAttempts: 1,
@@ -518,6 +533,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
       controllerAccessRetryDelay: Duration.zero,
@@ -549,10 +565,7 @@ void main() {
     final bleService = FakeBleService();
     final localClient = FakeLocalControllerApiClient(
       exceptions: const [
-        LocalControllerApiException(
-          LocalControllerApiErrorKind.networkUnavailable,
-          'Controller network is unavailable',
-        ),
+        LocalControllerApiException(),
       ],
     );
     final controller = BleOnboardingController(
@@ -560,6 +573,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: localClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
       controllerAccessRetryDelay: Duration.zero,
@@ -576,7 +590,8 @@ void main() {
     expect(localClient.checkCalls, 2);
   });
 
-  test('bootstrap maps HTTPS 401 to tokenInvalid state', () async {
+  test('bootstrap maps local controller API failures to communication error',
+      () async {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
@@ -589,11 +604,9 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeLocalControllerApiClient(
-        exception: const LocalControllerApiException(
-          LocalControllerApiErrorKind.tokenInvalid,
-          'Controller rejected API access token',
-        ),
+        exception: const LocalControllerApiException(),
       ),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
     );
@@ -607,8 +620,8 @@ void main() {
 
     expect(controller.state, isA<ControllerAccessFailed>());
     expect(
-      controller.state.controllerAccessError?.kind,
-      ControllerAccessFailureKind.tokenInvalid,
+      controller.state.controllerAccessErrorMessage,
+      'Помилка комунікації з контролером.',
     );
   });
 

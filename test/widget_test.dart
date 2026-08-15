@@ -6,6 +6,7 @@ import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
+import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/phone_wifi_service.dart';
@@ -29,6 +30,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await tester.pumpWidget(
@@ -61,6 +63,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await tester.pumpWidget(
@@ -103,6 +106,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await tester.pumpWidget(
@@ -177,6 +181,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await tester.pumpWidget(
@@ -222,6 +227,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await tester.pumpWidget(
@@ -274,6 +280,7 @@ void main() {
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
       localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await tester.pumpWidget(
@@ -423,10 +430,7 @@ class FlakySettingsApiClient extends FakeSettingsApiClient {
   }) async {
     _calls += 1;
     if (_calls == 1) {
-      throw const LocalControllerApiException(
-        LocalControllerApiErrorKind.networkUnavailable,
-        'Controller network is unavailable',
-      );
+      throw const LocalControllerApiException();
     }
     return super.getSettings(
       ipAddress: ipAddress,

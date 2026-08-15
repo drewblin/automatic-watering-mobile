@@ -101,7 +101,7 @@ void main() {
     expect(apiClient.openValveSeconds, 60);
   });
 
-  test('dashboard refresh shows metrics HTTP status details', () async {
+  test('dashboard refresh shows generic communication error', () async {
     final stateStore = AppStateStore();
     final hub = _hub();
     final settings = SettingsResponseData.fromJson(settingsResponseDataJson);
@@ -117,10 +117,7 @@ void main() {
       ),
     );
     final apiClient = RecordingDashboardApiClient(
-      metricsException: const LocalControllerApiException(
-        LocalControllerApiErrorKind.unexpectedResponse,
-        'помилка, http код відповіді - 503',
-      ),
+      metricsException: const LocalControllerApiException(),
     );
     final controller = HomeDashboardController(
       stateStore: stateStore,
@@ -133,7 +130,7 @@ void main() {
     expect(controller.refreshStatus, DashboardRefreshStatus.failed);
     expect(
       controller.refreshErrorMessage,
-      'Не вдалося отримати стан: помилка, http код відповіді - 503.',
+      'Помилка комунікації з контролером.',
     );
   });
 }

@@ -1,5 +1,6 @@
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
+import '../../features/local_controller/diagnostics_log.dart';
 import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
@@ -10,13 +11,16 @@ class BlePairingFlow {
     required BleOnboardingSession session,
     required BleOnboardingStateStore stateStore,
     required BleService bleService,
+    required DiagnosticsLog diagnosticsLog,
   })  : _session = session,
         _stateStore = stateStore,
-        _bleService = bleService;
+        _bleService = bleService,
+        _diagnosticsLog = diagnosticsLog;
 
   final BleOnboardingSession _session;
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
+  final DiagnosticsLog _diagnosticsLog;
 
   Future<BleDiscoveredDevice?> connectSelectedDevice() async {
     final state = _stateStore.state;
@@ -47,8 +51,9 @@ class BlePairingFlow {
           foundDevices: _session.devices,
           device: device,
           error: bleOnboardingBleError(
-            'Не вдалося підключитися до контролера.',
-            error,
+            message: 'Не вдалося підключитися до контролера.',
+            error: error,
+            diagnosticsLog: _diagnosticsLog,
           ),
         ),
       );

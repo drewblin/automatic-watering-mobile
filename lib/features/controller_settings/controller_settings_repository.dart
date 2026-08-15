@@ -14,10 +14,7 @@ class ControllerSettingsRepository {
     final ipAddress = hub.lastKnownIpAddress;
     final token = hub.apiAccessToken;
     if (ipAddress == null || token == null) {
-      throw const LocalControllerApiException(
-        LocalControllerApiErrorKind.unexpectedResponse,
-        'Controller access is incomplete',
-      );
+      throw const LocalControllerApiException();
     }
 
     return _apiClient.getSettings(
