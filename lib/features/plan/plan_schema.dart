@@ -65,12 +65,12 @@ class ElementStyle {
 }
 
 class ZoneShapeElement {
-  const ZoneShapeElement({
+  ZoneShapeElement({
     required this.id,
-    required this.points,
+    required List<NormalizedPoint> points,
     required this.deviceObjectId,
     required this.style,
-  });
+  }) : points = List<NormalizedPoint>.unmodifiable(points);
 
   final String id;
   final List<NormalizedPoint> points;
@@ -223,15 +223,17 @@ class DeviceObjectMarker {
 }
 
 class PlanSchema {
-  const PlanSchema({
+  PlanSchema({
     required this.id,
     required this.wateringHubId,
     required this.version,
     required this.canvasSize,
-    required this.zoneShapes,
-    required this.landmarks,
-    required this.deviceMarkers,
-  });
+    required List<ZoneShapeElement> zoneShapes,
+    required List<LandmarkElement> landmarks,
+    required List<DeviceObjectMarker> deviceMarkers,
+  })  : zoneShapes = List<ZoneShapeElement>.unmodifiable(zoneShapes),
+        landmarks = List<LandmarkElement>.unmodifiable(landmarks),
+        deviceMarkers = List<DeviceObjectMarker>.unmodifiable(deviceMarkers);
 
   final String id;
   final String wateringHubId;

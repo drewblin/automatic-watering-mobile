@@ -11,13 +11,13 @@ enum AppStartupStatus {
 }
 
 class AppState {
-  const AppState({
+  AppState({
     required this.startupStatus,
     required this.activeWateringHub,
     required this.activePlanSchema,
     required this.settings,
-    required this.deviceObjects,
-  });
+    required List<DeviceObject> deviceObjects,
+  }) : deviceObjects = List<DeviceObject>.unmodifiable(deviceObjects);
 
   factory AppState.loading() {
     return AppState(

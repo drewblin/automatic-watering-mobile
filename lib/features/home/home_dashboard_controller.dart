@@ -61,7 +61,7 @@ class HomeDashboardController extends ChangeNotifier {
 
   DashboardRefreshStatus get refreshStatus => _refreshStatus;
   ManualValveCommandState get manualValveState => _manualValveState;
-  List<SensorMetric> get metrics => _metrics;
+  List<SensorMetric> get metrics => List.unmodifiable(_metrics);
   DateTime? get lastMetricsSyncedAt => _lastMetricsSyncedAt;
   String? get refreshErrorMessage => _refreshErrorMessage;
 

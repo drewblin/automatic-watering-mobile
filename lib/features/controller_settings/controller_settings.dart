@@ -277,15 +277,19 @@ class SoilSensorSetting {
 }
 
 class ControllerSettings {
-  const ControllerSettings({
+  ControllerSettings({
     required this.globalSettings,
     required this.remoteLogSettings,
-    required this.valveSettings,
+    required List<ValveSetting> valveSettings,
     required this.pressureSensor,
     required this.magistralWaterCounterSetting,
-    required this.leafWaterCounterSettings,
-    required this.soilSensorSettings,
-  });
+    required List<WaterCounterSetting> leafWaterCounterSettings,
+    required List<SoilSensorSetting> soilSensorSettings,
+  })  : valveSettings = List<ValveSetting>.unmodifiable(valveSettings),
+        leafWaterCounterSettings =
+            List<WaterCounterSetting>.unmodifiable(leafWaterCounterSettings),
+        soilSensorSettings =
+            List<SoilSensorSetting>.unmodifiable(soilSensorSettings);
 
   final GlobalSettings globalSettings;
   final RemoteLogSettings remoteLogSettings;

@@ -568,7 +568,7 @@ class FakeBleService implements BleService {
 class FakePhoneWifiService implements PhoneWifiService {
   @override
   Future<PhoneWifiSnapshot> readWifiSnapshot() async {
-    return const PhoneWifiSnapshot(
+    return PhoneWifiSnapshot(
       currentSsid: 'Garden',
       networks: [
         PhoneWifiNetwork(ssid: 'Garden', signalLevel: -45),

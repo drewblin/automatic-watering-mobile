@@ -23,10 +23,10 @@ class PhoneWifiNetwork {
 
 @immutable
 class PhoneWifiSnapshot {
-  const PhoneWifiSnapshot({
-    required this.networks,
+  PhoneWifiSnapshot({
+    required List<PhoneWifiNetwork> networks,
     this.currentSsid,
-  });
+  }) : networks = List<PhoneWifiNetwork>.unmodifiable(networks);
 
   final List<PhoneWifiNetwork> networks;
   final String? currentSsid;

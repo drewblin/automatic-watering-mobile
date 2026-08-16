@@ -70,7 +70,7 @@ class BleDiscoveryFlow {
 
     _session.devices = const [];
     _session.isBleConnected = false;
-    _stateStore.setState(const DiscoveringDevices(foundDevices: []));
+    _stateStore.setState(DiscoveringDevices(foundDevices: const []));
 
     try {
       await _bleService.startScan();

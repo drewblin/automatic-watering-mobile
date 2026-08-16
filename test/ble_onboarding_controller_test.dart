@@ -189,7 +189,7 @@ void main() {
     final controller = BleOnboardingController(
       bleService: FakeBleService(),
       phoneWifiService: FakePhoneWifiService(
-        snapshot: const PhoneWifiSnapshot(
+        snapshot: PhoneWifiSnapshot(
           currentSsid: 'Garden',
           networks: [
             PhoneWifiNetwork(ssid: 'Garden', signalLevel: -42),
@@ -797,14 +797,15 @@ class FakeBleService implements BleService {
 
 class FakePhoneWifiService implements PhoneWifiService {
   FakePhoneWifiService({
-    this.snapshot = const PhoneWifiSnapshot(
-      currentSsid: 'Garden',
-      networks: [
-        PhoneWifiNetwork(ssid: 'Garden', signalLevel: -45),
-        PhoneWifiNetwork(ssid: 'Greenhouse', signalLevel: -63),
-      ],
-    ),
-  });
+    PhoneWifiSnapshot? snapshot,
+  }) : snapshot = snapshot ??
+            PhoneWifiSnapshot(
+              currentSsid: 'Garden',
+              networks: const [
+                PhoneWifiNetwork(ssid: 'Garden', signalLevel: -45),
+                PhoneWifiNetwork(ssid: 'Greenhouse', signalLevel: -63),
+              ],
+            );
 
   final PhoneWifiSnapshot snapshot;
 

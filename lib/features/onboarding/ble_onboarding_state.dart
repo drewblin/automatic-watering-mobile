@@ -46,7 +46,8 @@ final class ReadyToScan extends BleOnboardingState {
 }
 
 final class DiscoveringDevices extends BleOnboardingState {
-  const DiscoveringDevices({required this.foundDevices});
+  DiscoveringDevices({required List<BleDiscoveredDevice> foundDevices})
+      : foundDevices = List<BleDiscoveredDevice>.unmodifiable(foundDevices);
 
   final List<BleDiscoveredDevice> foundDevices;
 
@@ -55,11 +56,11 @@ final class DiscoveringDevices extends BleOnboardingState {
 }
 
 final class DeviceSelected extends BleOnboardingState {
-  const DeviceSelected({
-    required this.foundDevices,
+  DeviceSelected({
+    required List<BleDiscoveredDevice> foundDevices,
     required this.device,
     this.error,
-  });
+  }) : foundDevices = List<BleDiscoveredDevice>.unmodifiable(foundDevices);
 
   final List<BleDiscoveredDevice> foundDevices;
   final BleDiscoveredDevice device;
@@ -76,10 +77,10 @@ final class DeviceSelected extends BleOnboardingState {
 }
 
 final class ConnectingDevice extends BleOnboardingState {
-  const ConnectingDevice({
-    required this.foundDevices,
+  ConnectingDevice({
+    required List<BleDiscoveredDevice> foundDevices,
     required this.device,
-  });
+  }) : foundDevices = List<BleDiscoveredDevice>.unmodifiable(foundDevices);
 
   final List<BleDiscoveredDevice> foundDevices;
   final BleDiscoveredDevice device;
@@ -92,11 +93,11 @@ final class ConnectingDevice extends BleOnboardingState {
 }
 
 final class AwaitingPairingPasskey extends BleOnboardingState {
-  const AwaitingPairingPasskey({
-    required this.foundDevices,
+  AwaitingPairingPasskey({
+    required List<BleDiscoveredDevice> foundDevices,
     required this.device,
     this.error,
-  });
+  }) : foundDevices = List<BleDiscoveredDevice>.unmodifiable(foundDevices);
 
   final List<BleDiscoveredDevice> foundDevices;
   final BleDiscoveredDevice device;
@@ -113,10 +114,10 @@ final class AwaitingPairingPasskey extends BleOnboardingState {
 }
 
 final class PairingInProgress extends BleOnboardingState {
-  const PairingInProgress({
-    required this.foundDevices,
+  PairingInProgress({
+    required List<BleDiscoveredDevice> foundDevices,
     required this.device,
-  });
+  }) : foundDevices = List<BleDiscoveredDevice>.unmodifiable(foundDevices);
 
   final List<BleDiscoveredDevice> foundDevices;
   final BleDiscoveredDevice device;
@@ -141,11 +142,14 @@ final class WifiCredentialsFormReady extends BleOnboardingState {
   WifiCredentialsFormReady({
     required this.device,
     required this.credentials,
-    this.validationErrors = const {},
-    this.phoneWifiNetworks = const [],
+    Map<String, String> validationErrors = const {},
+    List<PhoneWifiNetwork> phoneWifiNetworks = const [],
     this.isLoadingPhoneWifiNetworks = false,
     this.error,
-  }) : assert(credentials.password == '');
+  })  : validationErrors = Map<String, String>.unmodifiable(validationErrors),
+        phoneWifiNetworks =
+            List<PhoneWifiNetwork>.unmodifiable(phoneWifiNetworks),
+        assert(credentials.password == '');
 
   final BleDiscoveredDevice device;
   final WifiCredentials credentials;
