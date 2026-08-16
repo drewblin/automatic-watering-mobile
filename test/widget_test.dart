@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_test_composition.dart';
+import 'package:automatic_watering_mobile/app/app_state.dart';
 import 'package:automatic_watering_mobile/app/automatic_watering_app.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
@@ -139,11 +140,12 @@ void main() {
       lastKnownIpAddress: '192.168.1.42',
       updatedAt: DateTime.utc(2026, 1, 2),
     );
-    await composition.onboarding.saveControllerAccess(
-      hub: completeHub,
-      apiAccessToken: validToken,
-    );
-    await composition.onboarding.completeOnboarding(completeHub);
+    await composition.onboarding
+        .saveControllerAccess(
+          hub: completeHub,
+          apiAccessToken: validToken,
+        )
+        .then(composition.onboarding.completeOnboarding);
     await appController.initialize();
     await tester.pump();
 
@@ -294,6 +296,50 @@ void main() {
 
     expect(find.text('Додати контролер'), findsOneWidget);
   });
+
+  testWidgets('starts onboarding when completed hub has no saved token',
+      (tester) async {
+    final createdAt = DateTime.utc(2026);
+    final storage = InMemoryWateringHubStorage()
+      ..activeHub = WateringHub(
+        id: 'hub-aa-bb-cc',
+        displayName: 'Automatic Watering Hub',
+        bleDeviceId: 'AA:BB:CC',
+        lastKnownIpAddress: '192.168.1.42',
+        apiAccessToken: null,
+        serverDeviceId: null,
+        onboardingCompletedAt: createdAt,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      );
+    final client = FakeSettingsApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: InMemoryWateringHubTokenStorage(),
+      localControllerApiClient: client,
+    );
+    final appController = composition.appController;
+    final bleOnboardingController = BleOnboardingController(
+      bleService: FakeBleService(),
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeSettingsApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+    );
+
+    await tester.pumpWidget(
+      AutomaticWateringApp(
+        appController: appController,
+        bleOnboardingController: bleOnboardingController,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(appController.state.startupStatus, AppStartupStatus.onboarding);
+    expect(client.getCalls, 0);
+    expect(find.text('Додати контролер'), findsOneWidget);
+  });
 }
 
 const validToken =
@@ -340,6 +386,8 @@ const settingsResponseDataJson = {
 };
 
 class FakeSettingsApiClient implements LocalControllerApiClient {
+  int getCalls = 0;
+
   @override
   Future<void> checkSettingsAccess({
     required String ipAddress,
@@ -351,6 +399,7 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
     required String ipAddress,
     required String apiAccessToken,
   }) async {
+    getCalls += 1;
     return SettingsResponseData.fromJson(settingsResponseDataJson);
   }
 

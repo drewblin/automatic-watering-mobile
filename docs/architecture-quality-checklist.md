@@ -4,11 +4,6 @@
 
 ## Залишити
 
-- [ ] Зробити persistence доступу до контролера recoverable, якщо запис metadata hub і secure token завершився лише частково.
-  - Причина: onboarding записує профіль hub у `SharedPreferences`, а API token у secure storage окремими операціями. Частковий запис може залишити hub, який виглядає завершеним, але не має робочого доступу.
-  - Практичний ефект: startup зможе детерміновано відновитися або повернутися до onboarding замість того, щоб пізніше падати з generic controller communication error.
-  - Докази в коді: `lib/app/onboarding_app_service.dart`, `lib/storage/local_watering_hub_storage.dart`, `lib/storage/secure_watering_hub_token_storage.dart`.
-
 - [ ] Зробити `AppState` і колекції state models defensively immutable.
   - Причина: `AppState` є immutable за домовленістю, але приймає `List<DeviceObject>` напряму. Майбутні callers можуть змінити списки після публікації state і обійти `AppStateStore.notifyListeners`.
   - Практичний ефект: запобігає складній для діагностики десинхронізації UI/state, зберігаючи поточну `ChangeNotifier` архітектуру.

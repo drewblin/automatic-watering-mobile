@@ -24,29 +24,28 @@ class OnboardingAppService {
     required WateringHub hub,
     required String apiAccessToken,
   }) async {
+    final now = DateTime.now().toUtc();
     final hubWithoutPlainToken = hub.copyWith(clearApiAccessToken: true);
-    final hubWithToken = hub.copyWith(apiAccessToken: apiAccessToken);
     await _wateringHubStorage.saveActiveWateringHub(hubWithoutPlainToken);
     await _tokenStorage.saveApiAccessToken(
       wateringHubId: hub.id,
       token: apiAccessToken,
     );
-    return hubWithToken;
-  }
-
-  Future<void> completeOnboarding(WateringHub hub) async {
-    final now = DateTime.now().toUtc();
     final completedHub = hub.copyWith(
+      apiAccessToken: apiAccessToken,
       onboardingCompletedAt: now,
       updatedAt: now,
     );
     await _wateringHubStorage.saveActiveWateringHub(
       completedHub.copyWith(clearApiAccessToken: true),
     );
+    return completedHub;
+  }
 
+  Future<void> completeOnboarding(WateringHub hub) async {
     _stateStore.setState(
       AppState.readyForOnboarding(
-        activeWateringHub: completedHub,
+        activeWateringHub: hub,
       ),
     );
   }

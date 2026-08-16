@@ -40,7 +40,7 @@ class AppStartupService {
 
     final token = await _tokenStorage.readApiAccessToken(hubWithoutToken.id);
     final hub = hubWithoutToken.copyWith(apiAccessToken: token);
-    if (!hub.isOnboardingComplete) {
+    if (!hub.isOnboardingComplete || hub.readyAccess == null) {
       _stateStore.setState(
         AppState.readyForOnboarding(
           activeWateringHub: hub,
