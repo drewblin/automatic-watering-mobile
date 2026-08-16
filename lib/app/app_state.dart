@@ -72,6 +72,16 @@ class AppState {
     return hub;
   }
 
+  ReadyWateringHubAccess get readyWateringHubAccess {
+    final access = readyWateringHub.readyAccess;
+    if (access == null) {
+      throw StateError(
+        'AppState is ready with a watering hub but controller access is incomplete.',
+      );
+    }
+    return access;
+  }
+
   SettingsResponseData get readySettings {
     final currentSettings = settings;
     if (startupStatus != AppStartupStatus.ready || currentSettings == null) {

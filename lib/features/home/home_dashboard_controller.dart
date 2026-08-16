@@ -68,10 +68,11 @@ class HomeDashboardController extends ChangeNotifier {
   bool get isRefreshing => _refreshStatus == DashboardRefreshStatus.loading;
 
   Future<void> refresh() async {
-    final hub = _stateStore.state.readyWateringHub;
+    final access = _stateStore.state.readyWateringHubAccess;
+    final hub = access.hub;
     _setRefreshState(DashboardRefreshStatus.loading);
     try {
-      final settings = await _settingsRepository.syncSettings(hub);
+      final settings = await _settingsRepository.syncSettings(access);
       final deviceObjects = buildDeviceObjects(
         wateringHubId: hub.id,
         settings: settings.settings,
@@ -85,8 +86,8 @@ class HomeDashboardController extends ChangeNotifier {
       );
 
       final rawMetrics = await _apiClient.getSensorMetrics(
-        ipAddress: hub.lastKnownIpAddress!,
-        apiAccessToken: hub.apiAccessToken!,
+        ipAddress: access.ipAddress,
+        apiAccessToken: access.apiAccessToken,
       );
       _metrics = _mapMetrics(rawMetrics, deviceObjects);
       _lastMetricsSyncedAt = DateTime.now().toUtc();
@@ -126,7 +127,7 @@ class HomeDashboardController extends ChangeNotifier {
       return false;
     }
 
-    final hub = _stateStore.state.readyWateringHub;
+    final access = _stateStore.state.readyWateringHubAccess;
     _setManualValveState(
       ManualValveCommandState(
         status: ManualValveCommandStatus.sending,
@@ -135,8 +136,8 @@ class HomeDashboardController extends ChangeNotifier {
     );
     try {
       await _apiClient.openValveForTime(
-        ipAddress: hub.lastKnownIpAddress!,
-        apiAccessToken: hub.apiAccessToken!,
+        ipAddress: access.ipAddress,
+        apiAccessToken: access.apiAccessToken,
         pin: valve.pin,
         seconds: seconds,
       );

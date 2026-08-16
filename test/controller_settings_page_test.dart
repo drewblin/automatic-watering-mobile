@@ -20,7 +20,7 @@ void main() {
     final settings =
         SettingsResponseData.fromJson(settingsResponseDataJson).settings;
 
-    await repository.saveSettings(_hub(), settings);
+    await repository.saveSettings(_hub().readyAccess!, settings);
 
     expect(client.putIpAddress, '192.168.1.42');
     expect(client.putApiAccessToken, 'token');

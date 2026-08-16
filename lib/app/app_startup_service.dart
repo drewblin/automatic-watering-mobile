@@ -1,6 +1,7 @@
 import '../features/controller_settings/controller_settings_repository.dart';
 import '../features/controller_settings/device_objects.dart';
 import '../features/controller_settings/settings_response_data.dart';
+import '../features/local_controller/local_controller_api_client.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';
 import '../storage/watering_hub_storage.dart';
@@ -75,7 +76,11 @@ class AppStartupService {
 
   Future<SettingsResponseData> _loadSettings(WateringHub hub) async {
     try {
-      return await _controllerSettingsRepository.syncSettings(hub);
+      final access = hub.readyAccess;
+      if (access == null) {
+        throw const LocalControllerApiException();
+      }
+      return await _controllerSettingsRepository.syncSettings(access);
     } catch (error) {
       throw FatalAppException(
         'Не вдалося завантажити налаштування контролера',

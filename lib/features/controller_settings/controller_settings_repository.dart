@@ -10,26 +10,20 @@ class ControllerSettingsRepository {
 
   final LocalControllerApiClient _apiClient;
 
-  Future<SettingsResponseData> syncSettings(WateringHub hub) async {
-    final ipAddress = hub.lastKnownIpAddress;
-    final token = hub.apiAccessToken;
-    if (ipAddress == null || token == null) {
-      throw const LocalControllerApiException();
-    }
-
+  Future<SettingsResponseData> syncSettings(ReadyWateringHubAccess access) {
     return _apiClient.getSettings(
-      ipAddress: ipAddress,
-      apiAccessToken: token,
+      ipAddress: access.ipAddress,
+      apiAccessToken: access.apiAccessToken,
     );
   }
 
   Future<void> saveSettings(
-    WateringHub hub,
+    ReadyWateringHubAccess access,
     ControllerSettings settings,
   ) async {
     await _apiClient.putSettings(
-      ipAddress: hub.lastKnownIpAddress!,
-      apiAccessToken: hub.apiAccessToken!,
+      ipAddress: access.ipAddress,
+      apiAccessToken: access.apiAccessToken,
       settings: settings,
     );
   }

@@ -63,13 +63,14 @@ class ControllerSettingsSaveController {
   Stream<ControllerSettingsSaveFlowState> get states => _controller.stream;
 
   Future<bool> save(ControllerSettings settings) async {
-    final hub = _stateStore.state.readyWateringHub;
+    final access = _stateStore.state.readyWateringHubAccess;
+    final hub = access.hub;
     _emit(const ControllerSettingsSaveFlowState(
       status: ControllerSettingsSaveFlowStatus.saving,
       message: 'Зберігаємо налаштування...',
     ));
     try {
-      await _repository.saveSettings(hub, settings);
+      await _repository.saveSettings(access, settings);
     } on LocalControllerApiException catch (error) {
       _emit(ControllerSettingsSaveFlowState(
         status: ControllerSettingsSaveFlowStatus.saveFailed,
@@ -93,7 +94,7 @@ class ControllerSettingsSaveController {
     Object? lastError;
     while (DateTime.now().isBefore(deadline)) {
       try {
-        final refreshed = await _repository.syncSettings(hub);
+        final refreshed = await _repository.syncSettings(access);
         _stateStore.setState(
           _stateStore.state.copyWith(
             startupStatus: AppStartupStatus.ready,

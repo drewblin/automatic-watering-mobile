@@ -25,6 +25,19 @@ class WateringHub {
 
   bool get isOnboardingComplete => onboardingCompletedAt != null;
 
+  ReadyWateringHubAccess? get readyAccess {
+    final ipAddress = lastKnownIpAddress;
+    final token = apiAccessToken;
+    if (ipAddress == null || token == null) {
+      return null;
+    }
+    return ReadyWateringHubAccess(
+      hub: this,
+      ipAddress: ipAddress,
+      apiAccessToken: token,
+    );
+  }
+
   factory WateringHub.fromJson(Map<String, Object?> json) {
     return WateringHub(
       id: readString(json['id'], 'id'),
@@ -81,4 +94,18 @@ class WateringHub {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+}
+
+class ReadyWateringHubAccess {
+  const ReadyWateringHubAccess({
+    required this.hub,
+    required this.ipAddress,
+    required this.apiAccessToken,
+  });
+
+  final WateringHub hub;
+  final String ipAddress;
+  final String apiAccessToken;
+
+  String get wateringHubId => hub.id;
 }

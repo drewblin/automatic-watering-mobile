@@ -4,11 +4,6 @@
 
 ## Залишити
 
-- [ ] Додати явний value object для "готового доступу до hub" у кодових шляхах, яким потрібні `lastKnownIpAddress` і `apiAccessToken`.
-  - Причина: `ControllerSettingsRepository.saveSettings` і `HomeDashboardController` зараз використовують non-null assertions після читання `AppState.readyWateringHub`. Інваріант реальний, але неявний і може зламатися зі зростанням застосунку.
-  - Практичний ефект: централізує перевірку "готового підключення до контролера", прибирає повторювані `!` і дає одне місце для user-facing recovery path, коли IP або token відсутні.
-  - Докази в коді: `lib/features/controller_settings/controller_settings_repository.dart`, `lib/features/home/home_dashboard_controller.dart`, `lib/app/app_state.dart`.
-
 - [ ] Зробити persistence доступу до контролера recoverable, якщо запис metadata hub і secure token завершився лише частково.
   - Причина: onboarding записує профіль hub у `SharedPreferences`, а API token у secure storage окремими операціями. Частковий запис може залишити hub, який виглядає завершеним, але не має робочого доступу.
   - Практичний ефект: startup зможе детерміновано відновитися або повернутися до onboarding замість того, щоб пізніше падати з generic controller communication error.
