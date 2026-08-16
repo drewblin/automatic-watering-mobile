@@ -57,6 +57,7 @@ Future<void> main() async {
         wateringHubStorage: wateringHubStorage,
         tokenStorage: tokenStorage,
         controllerSettingsRepository: controllerSettingsRepository,
+        diagnosticsLog: diagnosticsLog,
       );
       final onboardingService = OnboardingAppService(
         stateStore: stateStore,

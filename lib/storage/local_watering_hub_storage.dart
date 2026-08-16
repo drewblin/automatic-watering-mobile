@@ -20,8 +20,18 @@ class SharedPreferencesWateringHubStorage implements WateringHubStorage {
     if (rawJson == null) {
       return null;
     }
-    final decoded = jsonDecode(rawJson) as Map<String, Object?>;
-    return WateringHub.fromJson(decoded);
+    try {
+      final decoded = jsonDecode(rawJson) as Map<String, Object?>;
+      return WateringHub.fromJson(decoded);
+    } catch (error) {
+      await _preferences.remove(_activeHubKey);
+      throw WateringHubStorageCorruptionException(
+        message: 'Saved watering hub profile is corrupted.',
+        storageKey: _activeHubKey,
+        sourceError: error,
+        wateringHubId: _readWateringHubId(rawJson),
+      );
+    }
   }
 
   @override
@@ -31,12 +41,23 @@ class SharedPreferencesWateringHubStorage implements WateringHubStorage {
 
   @override
   Future<PlanSchema?> readPlanSchema(String wateringHubId) async {
-    final rawJson = _preferences.getString(_planKey(wateringHubId));
+    final key = _planKey(wateringHubId);
+    final rawJson = _preferences.getString(key);
     if (rawJson == null) {
       return null;
     }
-    final decoded = jsonDecode(rawJson) as Map<String, Object?>;
-    return PlanSchema.fromJson(decoded);
+    try {
+      final decoded = jsonDecode(rawJson) as Map<String, Object?>;
+      return PlanSchema.fromJson(decoded);
+    } catch (error) {
+      await _preferences.remove(key);
+      throw WateringHubStorageCorruptionException(
+        message: 'Saved watering plan schema is corrupted.',
+        storageKey: key,
+        sourceError: error,
+        wateringHubId: wateringHubId,
+      );
+    }
   }
 
   @override
@@ -54,4 +75,17 @@ class SharedPreferencesWateringHubStorage implements WateringHubStorage {
   }
 
   String _planKey(String wateringHubId) => '$_planKeyPrefix$wateringHubId';
+
+  String? _readWateringHubId(String rawJson) {
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map<String, Object?>) {
+        final id = decoded['id'];
+        return id is String && id.isNotEmpty ? id : null;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
 }

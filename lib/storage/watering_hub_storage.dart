@@ -13,6 +13,25 @@ abstract interface class WateringHubStorage {
   Future<void> clearWateringHubProfile(String wateringHubId);
 }
 
+class WateringHubStorageCorruptionException implements Exception {
+  const WateringHubStorageCorruptionException({
+    required this.message,
+    required this.storageKey,
+    required this.sourceError,
+    this.wateringHubId,
+  });
+
+  final String message;
+  final String storageKey;
+  final Object sourceError;
+  final String? wateringHubId;
+
+  @override
+  String toString() {
+    return '$message (key: $storageKey, error: $sourceError)';
+  }
+}
+
 abstract interface class WateringHubTokenStorage {
   Future<String?> readApiAccessToken(String wateringHubId);
 

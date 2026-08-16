@@ -1,6 +1,7 @@
 import '../features/controller_settings/controller_settings_repository.dart';
 import '../features/controller_settings/device_objects.dart';
 import '../features/controller_settings/settings_response_data.dart';
+import '../features/local_controller/diagnostics_log.dart';
 import '../features/local_controller/local_controller_api_client.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';
@@ -15,20 +16,29 @@ class AppStartupService {
     required WateringHubStorage wateringHubStorage,
     required WateringHubTokenStorage tokenStorage,
     required ControllerSettingsRepository controllerSettingsRepository,
+    required DiagnosticsLog diagnosticsLog,
   })  : _stateStore = stateStore,
         _wateringHubStorage = wateringHubStorage,
         _tokenStorage = tokenStorage,
-        _controllerSettingsRepository = controllerSettingsRepository;
+        _controllerSettingsRepository = controllerSettingsRepository,
+        _diagnosticsLog = diagnosticsLog;
 
   final AppStateStore _stateStore;
   final WateringHubStorage _wateringHubStorage;
   final WateringHubTokenStorage _tokenStorage;
   final ControllerSettingsRepository _controllerSettingsRepository;
+  final DiagnosticsLog _diagnosticsLog;
 
   Future<void> initialize() async {
     _stateStore.setState(AppState.loading());
 
-    final hubWithoutToken = await _wateringHubStorage.readActiveWateringHub();
+    final WateringHub? hubWithoutToken;
+    try {
+      hubWithoutToken = await _wateringHubStorage.readActiveWateringHub();
+    } on WateringHubStorageCorruptionException catch (error) {
+      await _resetCorruptedPersistence(error);
+      return;
+    }
     if (hubWithoutToken == null) {
       _stateStore.setState(
         AppState.readyForOnboarding(
@@ -49,7 +59,13 @@ class AppStartupService {
       return;
     }
 
-    final planSchema = await _wateringHubStorage.readPlanSchema(hub.id);
+    final PlanSchema? planSchema;
+    try {
+      planSchema = await _wateringHubStorage.readPlanSchema(hub.id);
+    } on WateringHubStorageCorruptionException catch (error) {
+      await _resetCorruptedPersistence(error);
+      return;
+    }
     await _loadReadyHub(
       hub: hub,
       activePlanSchema: planSchema,
@@ -87,5 +103,28 @@ class AppStartupService {
         error,
       );
     }
+  }
+
+  Future<void> _resetCorruptedPersistence(
+    WateringHubStorageCorruptionException error,
+  ) async {
+    recordDiagnosticsIssue(
+      diagnosticsLog: _diagnosticsLog,
+      message:
+          'Пошкоджені збережені дані контролера. Повертаємося до onboarding.',
+      error: error.sourceError,
+      details: error.toString(),
+    );
+
+    final wateringHubId = error.wateringHubId;
+    if (wateringHubId != null) {
+      // todo Подумати, щоб не чистити. Коли onboarding навчиться працювати "частково"
+      await _wateringHubStorage.clearWateringHubProfile(wateringHubId);
+      await _tokenStorage.deleteApiAccessToken(wateringHubId);
+    }
+
+    _stateStore.setState(
+      AppState.readyForOnboarding(activeWateringHub: null),
+    );
   }
 }
