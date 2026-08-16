@@ -192,59 +192,32 @@ class FlutterReactiveBleService implements BleService {
 
   @override
   Future<WifiCredentials> readWifiSettings(String deviceId) async {
-    _ensureConnected(deviceId);
-    final value = await _ble.readCharacteristic(
-      _qualifiedCharacteristic(
-        deviceId,
-        AutomaticWateringBleConstants.wifiSettings.uuid,
-      ),
+    return _readEnvelopeCharacteristic(
+      deviceId: deviceId,
+      characteristicUuid: AutomaticWateringBleConstants.wifiSettings.uuid,
+      parseData: WifiCredentials.fromControllerSettings,
+      failureMessage: 'Wi-Fi settings read failed',
     );
-    final envelope = _decodeEnvelope<WifiCredentials>(
-      value,
-      WifiCredentials.fromControllerSettings,
-    );
-    if (!envelope.success) {
-      throw StateError(envelope.error ?? 'Wi-Fi settings read failed');
-    }
-    return envelope.data;
   }
 
   @override
   Future<ControllerIpAddress> readWifiIpAddress(String deviceId) async {
-    _ensureConnected(deviceId);
-    final value = await _ble.readCharacteristic(
-      _qualifiedCharacteristic(
-        deviceId,
-        AutomaticWateringBleConstants.wifiIpAddress.uuid,
-      ),
+    return _readEnvelopeCharacteristic(
+      deviceId: deviceId,
+      characteristicUuid: AutomaticWateringBleConstants.wifiIpAddress.uuid,
+      parseData: ControllerIpAddress.fromJson,
+      failureMessage: 'Wi-Fi IP address read failed',
     );
-    final envelope = _decodeEnvelope<ControllerIpAddress>(
-      value,
-      ControllerIpAddress.fromJson,
-    );
-    if (!envelope.success) {
-      throw StateError(envelope.error ?? 'Wi-Fi IP address read failed');
-    }
-    return envelope.data;
   }
 
   @override
   Future<ControllerApiAccessToken> readApiAccessToken(String deviceId) async {
-    _ensureConnected(deviceId);
-    final value = await _ble.readCharacteristic(
-      _qualifiedCharacteristic(
-        deviceId,
-        AutomaticWateringBleConstants.apiAccessToken.uuid,
-      ),
+    return _readEnvelopeCharacteristic(
+      deviceId: deviceId,
+      characteristicUuid: AutomaticWateringBleConstants.apiAccessToken.uuid,
+      parseData: ControllerApiAccessToken.fromJson,
+      failureMessage: 'API access token read failed',
     );
-    final envelope = _decodeEnvelope<ControllerApiAccessToken>(
-      value,
-      ControllerApiAccessToken.fromJson,
-    );
-    if (!envelope.success) {
-      throw StateError(envelope.error ?? 'API access token read failed');
-    }
-    return envelope.data;
   }
 
   @override
@@ -252,31 +225,15 @@ class FlutterReactiveBleService implements BleService {
     required String deviceId,
     required WifiCredentials credentials,
   }) async {
-    _ensureConnected(deviceId);
-    final characteristic = _qualifiedCharacteristic(
-      deviceId,
-      AutomaticWateringBleConstants.saveWifiSettings.uuid,
+    return _writeJsonAndReadEnvelopeCharacteristic(
+      deviceId: deviceId,
+      characteristicUuid: AutomaticWateringBleConstants.saveWifiSettings.uuid,
+      payload: credentials.toBleJson(),
+      parseData: SaveWifiSettingsResponse.fromJson,
+      failureMessage: 'Wi-Fi settings save failed',
+      fallbackOnReadFailure:
+          const SaveWifiSettingsResponse(restartScheduled: true),
     );
-    await _ble.writeCharacteristicWithResponse(
-      characteristic,
-      value: utf8.encode(jsonEncode(credentials.toBleJson())),
-    );
-
-    ApiEnvelope<SaveWifiSettingsResponse> envelope;
-    try {
-      final responseValue = await _ble.readCharacteristic(characteristic);
-      envelope = _decodeEnvelope<SaveWifiSettingsResponse>(
-        responseValue,
-        SaveWifiSettingsResponse.fromJson,
-      );
-    } catch (_) {
-      return const SaveWifiSettingsResponse(restartScheduled: true);
-    }
-
-    if (!envelope.success) {
-      throw StateError(envelope.error ?? 'Wi-Fi settings save failed');
-    }
-    return envelope.data;
   }
 
   @override
@@ -333,6 +290,59 @@ class FlutterReactiveBleService implements BleService {
     if (_connectedDeviceId != deviceId) {
       throw StateError('BLE device is not connected');
     }
+  }
+
+  Future<T> _readEnvelopeCharacteristic<T>({
+    required String deviceId,
+    required String characteristicUuid,
+    required T Function(Object? data) parseData,
+    required String failureMessage,
+  }) async {
+    _ensureConnected(deviceId);
+    final value = await _ble.readCharacteristic(
+      _qualifiedCharacteristic(deviceId, characteristicUuid),
+    );
+    return _parseEnvelopeData(value, parseData, failureMessage);
+  }
+
+  Future<T> _writeJsonAndReadEnvelopeCharacteristic<T>({
+    required String deviceId,
+    required String characteristicUuid,
+    required Map<String, Object?> payload,
+    required T Function(Object? data) parseData,
+    required String failureMessage,
+    T? fallbackOnReadFailure,
+  }) async {
+    _ensureConnected(deviceId);
+    final characteristic =
+        _qualifiedCharacteristic(deviceId, characteristicUuid);
+    await _ble.writeCharacteristicWithResponse(
+      characteristic,
+      value: utf8.encode(jsonEncode(payload)),
+    );
+
+    try {
+      final responseValue = await _ble.readCharacteristic(characteristic);
+      return _parseEnvelopeData(responseValue, parseData, failureMessage);
+    } catch (_) {
+      final fallback = fallbackOnReadFailure;
+      if (fallback != null) {
+        return fallback;
+      }
+      rethrow;
+    }
+  }
+
+  T _parseEnvelopeData<T>(
+    List<int> value,
+    T Function(Object? data) parseData,
+    String failureMessage,
+  ) {
+    final envelope = _decodeEnvelope<T>(value, parseData);
+    if (!envelope.success) {
+      throw StateError(envelope.error ?? failureMessage);
+    }
+    return envelope.data;
   }
 
   ApiEnvelope<T> _decodeEnvelope<T>(
