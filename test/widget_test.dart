@@ -46,6 +46,13 @@ void main() {
     expect(find.text('Автоматичний полив'), findsOneWidget);
     expect(find.text('Додати контролер'), findsOneWidget);
     expect(find.text('Готово до пошуку'), findsOneWidget);
+    expect(find.byTooltip('Сервісна консоль'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Сервісна консоль'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сервісна консоль'), findsOneWidget);
+    expect(find.text('Діагностика'), findsOneWidget);
   });
 
   testWidgets('search button retries BLE availability when Bluetooth was off',
@@ -152,6 +159,7 @@ void main() {
     expect(find.text('Додати контролер'), findsNothing);
     expect(find.text('Automatic Watering Hub'), findsOneWidget);
     expect(find.text('Контролер доступний'), findsOneWidget);
+    expect(find.byTooltip('Сервісна консоль'), findsOneWidget);
   });
 
   testWidgets('starts on main screen when saved controller access exists',
@@ -198,6 +206,19 @@ void main() {
     expect(find.text('Додати контролер'), findsNothing);
     expect(find.text('Automatic Watering Hub'), findsOneWidget);
     expect(find.text('Контролер доступний'), findsOneWidget);
+    expect(find.byTooltip('Сервісна консоль'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Налаштування контролера'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Налаштування контролера'), findsOneWidget);
+    expect(find.byTooltip('Сервісна консоль'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Сервісна консоль'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сервісна консоль'), findsOneWidget);
+    expect(find.text('Діагностика'), findsOneWidget);
   });
 
   testWidgets('retries startup settings load after fatal error',
@@ -245,6 +266,7 @@ void main() {
     expect(find.text('Помилка запуску'), findsOneWidget);
     expect(find.text('Повторити'), findsOneWidget);
     expect(find.text('Повторити onboarding'), findsOneWidget);
+    expect(find.byTooltip('Сервісна консоль'), findsOneWidget);
     expect(find.text('Налаштування контролера'), findsNothing);
 
     await tester.tap(find.text('Повторити'));

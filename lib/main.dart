@@ -18,6 +18,7 @@ import 'features/local_controller/diagnostics_log.dart';
 import 'features/local_controller/local_controller_api_client.dart';
 import 'features/onboarding/ble_onboarding_controller.dart';
 import 'features/onboarding/phone_wifi_service.dart';
+import 'features/service_console/service_console_dependencies.dart';
 import 'storage/local_watering_hub_storage.dart';
 import 'storage/secure_watering_hub_token_storage.dart';
 
@@ -67,6 +68,9 @@ Future<void> main() async {
       final appController = AppController(
         stateStore: stateStore,
         startupService: startupService,
+        serviceConsoleDependencies: ServiceConsoleDependencies(
+          diagnosticsLog: diagnosticsLog,
+        ),
         settingsSaveController: ControllerSettingsSaveController(
           stateStore: stateStore,
           repository: controllerSettingsRepository,

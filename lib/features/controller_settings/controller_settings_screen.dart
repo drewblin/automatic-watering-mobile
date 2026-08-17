@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../app/app_header.dart';
+import '../service_console/service_console_dependencies.dart';
 import 'controller_settings.dart';
 import 'controller_settings_form_draft.dart';
 import 'controller_settings_save_controller.dart';
@@ -13,12 +15,14 @@ class ControllerSettingsScreen extends StatefulWidget {
     required this.settings,
     required this.deviceObjects,
     required this.saveController,
+    required this.serviceConsoleDependencies,
     super.key,
   });
 
   final SettingsResponseData settings;
   final List<DeviceObject> deviceObjects;
   final ControllerSettingsSaveController saveController;
+  final ServiceConsoleDependencies serviceConsoleDependencies;
 
   @override
   State<ControllerSettingsScreen> createState() =>
@@ -165,8 +169,9 @@ class _ControllerSettingsScreenState extends State<ControllerSettingsScreen> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Налаштування контролера'),
+        appBar: AppHeader(
+          title: 'Налаштування контролера',
+          serviceConsoleDependencies: widget.serviceConsoleDependencies,
           actions: [
             TextButton(
               onPressed: _canSave ? _save : null,

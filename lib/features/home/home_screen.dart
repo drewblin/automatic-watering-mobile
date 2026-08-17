@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_header.dart';
 import '../../app/app_state.dart';
 import '../controller_settings/controller_settings_save_controller.dart';
 import '../controller_settings/controller_settings_screen.dart';
 import '../onboarding/ble_onboarding_controller.dart';
 import '../onboarding/ble_onboarding_screen.dart';
+import '../service_console/service_console_dependencies.dart';
 import 'home_dashboard.dart';
 import 'home_dashboard_controller.dart';
 
@@ -12,6 +14,7 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({
     required this.state,
     required this.onOnboardingComplete,
+    required this.serviceConsoleDependencies,
     required this.bleOnboardingController,
     required this.settingsSaveController,
     required this.homeDashboardController,
@@ -20,6 +23,7 @@ class HomeScreen extends StatelessWidget {
 
   final AppState state;
   final Future<void> Function() onOnboardingComplete;
+  final ServiceConsoleDependencies serviceConsoleDependencies;
   final BleOnboardingController bleOnboardingController;
   final ControllerSettingsSaveController settingsSaveController;
   final HomeDashboardController homeDashboardController;
@@ -27,8 +31,9 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Автоматичний полив'),
+      appBar: AppHeader(
+        title: 'Автоматичний полив',
+        serviceConsoleDependencies: serviceConsoleDependencies,
         actions: [
           if (state.startupStatus == AppStartupStatus.ready)
             IconButton(
@@ -61,6 +66,7 @@ class HomeScreen extends StatelessWidget {
           settings: state.readySettings,
           deviceObjects: state.deviceObjects,
           saveController: settingsSaveController,
+          serviceConsoleDependencies: serviceConsoleDependencies,
         ),
       ),
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../features/service_console/service_console_dependencies.dart';
+import 'app_header.dart';
 import 'status_panel.dart';
 
 class FatalErrorScreen extends StatelessWidget {
@@ -7,17 +9,22 @@ class FatalErrorScreen extends StatelessWidget {
     required this.error,
     required this.onRetry,
     required this.onRestartOnboarding,
+    required this.serviceConsoleDependencies,
     super.key,
   });
 
   final Object error;
   final VoidCallback onRetry;
   final VoidCallback onRestartOnboarding;
+  final ServiceConsoleDependencies serviceConsoleDependencies;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Автоматичний полив')),
+      appBar: AppHeader(
+        title: 'Автоматичний полив',
+        serviceConsoleDependencies: serviceConsoleDependencies,
+      ),
       body: Center(
         child: StatusPanel(
           title: 'Помилка запуску',

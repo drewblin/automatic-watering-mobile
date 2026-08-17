@@ -111,14 +111,17 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
               error: fatalError,
               onRetry: _retryInitialize,
               onRestartOnboarding: _restartOnboarding,
+              serviceConsoleDependencies:
+                  widget.appController.serviceConsoleDependencies,
             );
           }
           return HomeScreen(
             state: widget.appController.state,
             onOnboardingComplete: _initialize,
+            serviceConsoleDependencies:
+                widget.appController.serviceConsoleDependencies,
             bleOnboardingController: widget.bleOnboardingController,
-            settingsSaveController:
-                widget.appController.settingsSaveController,
+            settingsSaveController: widget.appController.settingsSaveController,
             homeDashboardController:
                 widget.appController.homeDashboardController,
           );

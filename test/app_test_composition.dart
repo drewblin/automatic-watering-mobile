@@ -7,6 +7,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
 import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
 class TestAppComposition {
@@ -37,6 +38,9 @@ class TestAppComposition {
     appController = AppController(
       stateStore: stateStore,
       startupService: startup,
+      serviceConsoleDependencies: ServiceConsoleDependencies(
+        diagnosticsLog: this.diagnosticsLog,
+      ),
       settingsSaveController: ControllerSettingsSaveController(
         stateStore: stateStore,
         repository: controllerSettingsRepository,
