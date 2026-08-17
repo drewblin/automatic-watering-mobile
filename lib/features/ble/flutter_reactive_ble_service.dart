@@ -237,6 +237,17 @@ class FlutterReactiveBleService implements BleService {
   }
 
   @override
+  Stream<List<int>> subscribeToLogNotifications(String deviceId) {
+    _ensureConnected(deviceId);
+    return _ble.subscribeToCharacteristic(
+      _qualifiedCharacteristic(
+        deviceId,
+        AutomaticWateringBleConstants.logNotifications.uuid,
+      ),
+    );
+  }
+
+  @override
   Future<void> dispose() async {
     await stopScan();
     await _connectionSubscription?.cancel();

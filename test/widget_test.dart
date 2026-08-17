@@ -584,6 +584,11 @@ class FakeBleService implements BleService {
   }
 
   @override
+  Stream<List<int>> subscribeToLogNotifications(String deviceId) {
+    return const Stream.empty();
+  }
+
+  @override
   Future<void> dispose() async {}
 }
 

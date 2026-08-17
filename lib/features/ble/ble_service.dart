@@ -33,5 +33,7 @@ abstract interface class BleService {
     required WifiCredentials credentials,
   });
 
+  Stream<List<int>> subscribeToLogNotifications(String deviceId);
+
   Future<void> dispose();
 }

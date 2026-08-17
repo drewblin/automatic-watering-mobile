@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app_controller.dart';
 import 'app/app_startup_service.dart';
 import 'app/app_state_store.dart';
+import 'app/active_watering_hub_listenable.dart';
 import 'app/automatic_watering_app.dart';
 import 'app/onboarding_app_service.dart';
 import 'features/ble/flutter_reactive_ble_service.dart';
@@ -18,6 +19,7 @@ import 'features/local_controller/diagnostics_log.dart';
 import 'features/local_controller/local_controller_api_client.dart';
 import 'features/onboarding/ble_onboarding_controller.dart';
 import 'features/onboarding/phone_wifi_service.dart';
+import 'features/service_console/ble_logs/ble_controller_logs_controller.dart';
 import 'features/service_console/service_console_dependencies.dart';
 import 'storage/local_watering_hub_storage.dart';
 import 'storage/secure_watering_hub_token_storage.dart';
@@ -53,6 +55,15 @@ Future<void> main() async {
         apiClient: localControllerApiClient,
       );
       final stateStore = AppStateStore();
+      final bleService = FlutterReactiveBleService();
+      final activeWateringHubListenable = AppStateActiveWateringHubListenable(
+        stateStore,
+      );
+      final bleLogsController = BleControllerLogsController(
+        bleService: bleService,
+        diagnosticsLog: diagnosticsLog,
+        activeWateringHubListenable: activeWateringHubListenable,
+      );
       final startupService = AppStartupService(
         stateStore: stateStore,
         wateringHubStorage: wateringHubStorage,
@@ -70,6 +81,7 @@ Future<void> main() async {
         startupService: startupService,
         serviceConsoleDependencies: ServiceConsoleDependencies(
           diagnosticsLog: diagnosticsLog,
+          bleLogsController: bleLogsController,
         ),
         settingsSaveController: ControllerSettingsSaveController(
           stateStore: stateStore,
@@ -82,7 +94,7 @@ Future<void> main() async {
         ),
       );
       final bleOnboardingController = BleOnboardingController(
-        bleService: FlutterReactiveBleService(),
+        bleService: bleService,
         phoneWifiService: PluginPhoneWifiService(),
         onboardingStorage: onboardingService,
         localControllerApiClient: localControllerApiClient,

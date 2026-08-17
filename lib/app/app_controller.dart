@@ -32,6 +32,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _stateStore.removeListener(notifyListeners);
+    serviceConsoleDependencies.bleLogsController.dispose();
     settingsSaveController.dispose();
     homeDashboardController.dispose();
     _stateStore.dispose();
