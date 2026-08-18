@@ -2,7 +2,7 @@ import '../../app/fatal_app_exception.dart';
 import '../../app/onboarding_app_service.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
-import '../../features/local_controller/diagnostics_log.dart';
+import '../../features/diagnostics/diagnostics_log.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
 import '../../features/watering_hubs/watering_hub.dart';
 import 'ble_onboarding_session.dart';

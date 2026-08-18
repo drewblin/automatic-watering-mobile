@@ -4,8 +4,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
+import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 
 void main() {
   test('settings success false logs controller error before parsing data',
@@ -60,6 +61,36 @@ void main() {
         diagnosticsLog.entries.single.message, 'Manual valve command rejected');
   });
 
+  test('Modbus controller error logs diagnostics and throws marker exception',
+      () async {
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final client = HttpLocalControllerApiClient(
+      httpClient: _FakeHttpClient(
+        responseBody: {
+          'success': false,
+          'error': 'Modbus device timeout',
+          'data': null,
+        },
+      ),
+      diagnosticsLog: diagnosticsLog,
+      timeout: const Duration(seconds: 1),
+    );
+
+    await expectLater(
+      client.changeModbusAddress(
+        ipAddress: '192.168.1.42',
+        apiAccessToken: 'token',
+        request: const ModbusAddressChangeRequest(
+          currentAddress: 11,
+          newAddress: 12,
+        ),
+      ),
+      throwsA(isA<LocalControllerApiException>()),
+    );
+
+    expect(diagnosticsLog.entries.single.message, 'Modbus device timeout');
+  });
+
   test('empty response success true succeeds without diagnostics entry',
       () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
@@ -84,6 +115,40 @@ void main() {
 
     expect(diagnosticsLog.entries, isEmpty);
   });
+
+  test('change Modbus address posts service request body', () async {
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final httpClient = _FakeHttpClient(
+      responseBody: {
+        'success': true,
+        'error': null,
+        'data': null,
+      },
+    );
+    final client = HttpLocalControllerApiClient(
+      httpClient: httpClient,
+      diagnosticsLog: diagnosticsLog,
+      timeout: const Duration(seconds: 1),
+    );
+
+    final result = await client.changeModbusAddress(
+      ipAddress: '192.168.1.42',
+      apiAccessToken: 'token',
+      request: const ModbusAddressChangeRequest(
+        currentAddress: 11,
+        newAddress: 12,
+      ),
+    );
+
+    expect(result.currentAddress, 11);
+    expect(result.newAddress, 12);
+    expect(httpClient.lastUri?.path, '/api/service/modbus-address');
+    expect(httpClient.lastRequestBody, {
+      'currentAddress': 11,
+      'newAddress': 12,
+    });
+    expect(diagnosticsLog.entries, isEmpty);
+  });
 }
 
 class _FakeHttpClient implements HttpClient {
@@ -91,20 +156,25 @@ class _FakeHttpClient implements HttpClient {
       : _responseBody = responseBody;
 
   final Map<String, Object?> _responseBody;
+  Uri? lastUri;
+  Map<String, Object?>? lastRequestBody;
 
   @override
   Future<HttpClientRequest> getUrl(Uri url) async {
-    return _FakeHttpClientRequest(_responseBody);
+    lastUri = url;
+    return _FakeHttpClientRequest(_responseBody, this);
   }
 
   @override
   Future<HttpClientRequest> postUrl(Uri url) async {
-    return _FakeHttpClientRequest(_responseBody);
+    lastUri = url;
+    return _FakeHttpClientRequest(_responseBody, this);
   }
 
   @override
   Future<HttpClientRequest> putUrl(Uri url) async {
-    return _FakeHttpClientRequest(_responseBody);
+    lastUri = url;
+    return _FakeHttpClientRequest(_responseBody, this);
   }
 
   @override
@@ -112,10 +182,12 @@ class _FakeHttpClient implements HttpClient {
 }
 
 class _FakeHttpClientRequest implements HttpClientRequest {
-  _FakeHttpClientRequest(this._responseBody);
+  _FakeHttpClientRequest(this._responseBody, this._client);
 
   final Map<String, Object?> _responseBody;
+  final _FakeHttpClient _client;
   final _headers = _FakeHttpHeaders();
+  final _body = <int>[];
 
   @override
   HttpHeaders get headers => _headers;
@@ -127,10 +199,16 @@ class _FakeHttpClientRequest implements HttpClientRequest {
   int contentLength = -1;
 
   @override
-  void add(List<int> data) {}
+  void add(List<int> data) {
+    _body.addAll(data);
+  }
 
   @override
   Future<HttpClientResponse> close() async {
+    if (_body.isNotEmpty) {
+      _client.lastRequestBody =
+          jsonDecode(utf8.decode(_body)) as Map<String, Object?>;
+    }
     return _FakeHttpClientResponse(_responseBody);
   }
 

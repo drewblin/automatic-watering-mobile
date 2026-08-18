@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../app/onboarding_app_service.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
-import '../../features/local_controller/diagnostics_log.dart';
+import '../../features/diagnostics/diagnostics_log.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
 import 'ble_controller_access_flow.dart';
 import 'ble_discovery_flow.dart';

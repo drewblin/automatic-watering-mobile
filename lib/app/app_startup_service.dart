@@ -1,7 +1,7 @@
 import '../features/controller_settings/controller_settings_repository.dart';
 import '../features/controller_settings/device_objects.dart';
 import '../features/controller_settings/settings_response_data.dart';
-import '../features/local_controller/diagnostics_log.dart';
+import '../features/diagnostics/diagnostics_log.dart';
 import '../features/local_controller/local_controller_api_client.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';

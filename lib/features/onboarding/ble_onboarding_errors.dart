@@ -1,5 +1,5 @@
 import '../../features/ble/ble_models.dart';
-import '../../features/local_controller/diagnostics_log.dart';
+import '../../features/diagnostics/diagnostics_log.dart';
 import 'wifi_provisioning_models.dart';
 
 BleConnectionError bleOnboardingBleError({

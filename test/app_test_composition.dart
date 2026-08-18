@@ -7,11 +7,12 @@ import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_save_controller.dart';
+import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
-import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_address/modbus_address_change_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';
 
@@ -53,6 +54,11 @@ class TestAppComposition {
             stateStore,
           ),
           autoReconnect: false,
+        ),
+        modbusAddressChangeController: ModbusAddressChangeController(
+          apiClient: localControllerApiClient,
+          activeControllerAccessProvider: () =>
+              stateStore.state.activeWateringHub?.readyAccess,
         ),
       ),
       settingsSaveController: ControllerSettingsSaveController(

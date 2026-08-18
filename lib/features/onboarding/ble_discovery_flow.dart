@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
-import '../../features/local_controller/diagnostics_log.dart';
+import '../../features/diagnostics/diagnostics_log.dart';
 import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';

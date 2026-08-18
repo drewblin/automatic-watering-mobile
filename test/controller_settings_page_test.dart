@@ -7,6 +7,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/device_objects.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -223,4 +224,16 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
     required int pin,
     required int seconds,
   }) async {}
+
+  @override
+  Future<ModbusAddressChangeResult> changeModbusAddress({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ModbusAddressChangeRequest request,
+  }) async {
+    return ModbusAddressChangeResult(
+      currentAddress: request.currentAddress,
+      newAddress: request.newAddress,
+    );
+  }
 }

@@ -9,8 +9,9 @@ import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
-import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
+import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
 import 'package:automatic_watering_mobile/features/onboarding/phone_wifi_service.dart';
@@ -919,4 +920,16 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     required int pin,
     required int seconds,
   }) async {}
+
+  @override
+  Future<ModbusAddressChangeResult> changeModbusAddress({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ModbusAddressChangeRequest request,
+  }) async {
+    return ModbusAddressChangeResult(
+      currentAddress: request.currentAddress,
+      newAddress: request.newAddress,
+    );
+  }
 }

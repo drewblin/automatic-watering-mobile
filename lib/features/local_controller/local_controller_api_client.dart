@@ -7,8 +7,9 @@ import 'package:crypto/crypto.dart';
 
 import '../controller_settings/controller_settings.dart';
 import '../controller_settings/settings_response_data.dart';
+import '../diagnostics/diagnostics_log.dart';
 import '../sensors/sensor_metric.dart';
-import 'diagnostics_log.dart';
+import 'modbus_address_change_models.dart';
 
 class LocalControllerApiException implements Exception {
   const LocalControllerApiException();
@@ -44,6 +45,12 @@ abstract interface class LocalControllerApiClient {
     required String apiAccessToken,
     required int pin,
     required int seconds,
+  });
+
+  Future<ModbusAddressChangeResult> changeModbusAddress({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ModbusAddressChangeRequest request,
   });
 }
 
@@ -129,6 +136,29 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       apiAccessToken: apiAccessToken,
       body: {'pin': pin, 'seconds': seconds},
       parse: _handleEmptyResponse,
+    );
+  }
+
+  @override
+  Future<ModbusAddressChangeResult> changeModbusAddress({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ModbusAddressChangeRequest request,
+  }) {
+    return _send(
+      request: _ControllerRequest.post(
+        ipAddress,
+        '/api/service/modbus-address',
+      ),
+      apiAccessToken: apiAccessToken,
+      body: request.toJson(),
+      parse: (response, controllerRequest) async {
+        await _handleEmptyResponse(response, controllerRequest);
+        return ModbusAddressChangeResult(
+          currentAddress: request.currentAddress,
+          newAddress: request.newAddress,
+        );
+      },
     );
   }
 

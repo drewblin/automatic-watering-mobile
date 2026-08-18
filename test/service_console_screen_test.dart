@@ -4,9 +4,15 @@ import 'dart:convert';
 import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
-import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
+import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
+import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
+import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_address/modbus_address_change_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_screen.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
@@ -24,7 +30,105 @@ void main() {
 
     expect(find.text('Сервісна консоль'), findsOneWidget);
     expect(find.text('Діагностика'), findsOneWidget);
+    expect(tester.widget<Tab>(find.byType(Tab).last).text, 'Modbus адреса');
     expect(find.text('Діагностичних записів немає.'), findsOneWidget);
+  });
+
+  testWidgets('shows Modbus address tab and validates address range',
+      (tester) async {
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Поточна адреса девайса'), findsOneWidget);
+    expect(find.text('Нова адреса'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), '0');
+    await tester.enterText(find.byType(TextField).at(1), '12');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pump();
+
+    expect(find.text('Поточна адреса має бути від 1 до 247.'), findsOneWidget);
+  });
+
+  testWidgets('blocks equal Modbus current and new addresses', (tester) async {
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '11');
+    await tester.enterText(find.byType(TextField).at(1), '11');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pump();
+
+    expect(
+      find.text('Нова адреса має відрізнятися від поточної.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('submits Modbus address change through API', (tester) async {
+    final apiClient = FakeLocalControllerApiClient();
+
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        localControllerApiClient: apiClient,
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '11');
+    await tester.enterText(find.byType(TextField).at(1), '12');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pumpAndSettle();
+
+    expect(apiClient.changedCurrentAddress, 11);
+    expect(apiClient.changedNewAddress, 12);
+    expect(find.text('Адресу 11 змінено на 12.'), findsOneWidget);
+  });
+
+  testWidgets('shows Modbus API failure message', (tester) async {
+    final apiClient = FakeLocalControllerApiClient(
+      exception: const LocalControllerApiException(),
+    );
+
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        localControllerApiClient: apiClient,
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '11');
+    await tester.enterText(find.byType(TextField).at(1), '12');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Контролер повернув помилку.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('renders diagnostics entries newest first with technical fields',
@@ -244,14 +348,20 @@ class _TestApp extends StatelessWidget {
     required this.diagnosticsLog,
     required this.bleService,
     this.bleLogsController,
+    this.localControllerApiClient,
+    this.activeWateringHub,
   });
 
   final DiagnosticsLog diagnosticsLog;
   final BleService bleService;
   final BleControllerLogsController? bleLogsController;
+  final LocalControllerApiClient? localControllerApiClient;
+  final WateringHub? activeWateringHub;
 
   @override
   Widget build(BuildContext context) {
+    final apiClient =
+        localControllerApiClient ?? FakeLocalControllerApiClient();
     return MaterialApp(
       home: ServiceConsoleScreen(
         dependencies: ServiceConsoleDependencies(
@@ -263,6 +373,11 @@ class _TestApp extends StatelessWidget {
                 activeWateringHubListenable:
                     FakeActiveWateringHubListenable(null),
               ),
+          modbusAddressChangeController: ModbusAddressChangeController(
+            apiClient: apiClient,
+            activeControllerAccessProvider: () =>
+                activeWateringHub?.readyAccess,
+          ),
         ),
       ),
     );
@@ -282,6 +397,10 @@ WateringHub _hub({required String bleDeviceId}) {
     createdAt: now,
     updatedAt: now,
   );
+}
+
+Future<void> _tapChangeAddressFormButton(WidgetTester tester) {
+  return tester.tap(find.widgetWithText(FilledButton, 'Змінити адресу'));
 }
 
 class FakeActiveWateringHubListenable extends ChangeNotifier
@@ -384,5 +503,68 @@ class FakeBleService implements BleService {
   @override
   Future<void> dispose() async {
     await _logs.close();
+  }
+}
+
+class FakeLocalControllerApiClient implements LocalControllerApiClient {
+  FakeLocalControllerApiClient({this.exception});
+
+  final LocalControllerApiException? exception;
+  int? changedCurrentAddress;
+  int? changedNewAddress;
+
+  @override
+  Future<void> checkSettingsAccess({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {}
+
+  @override
+  Future<SettingsResponseData> getSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> putSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ControllerSettings settings,
+  }) async {}
+
+  @override
+  Future<List<ControllerSensorMetric>> getSensorMetrics({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<void> openValveForTime({
+    required String ipAddress,
+    required String apiAccessToken,
+    required int pin,
+    required int seconds,
+  }) async {}
+
+  @override
+  Future<ModbusAddressChangeResult> changeModbusAddress({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ModbusAddressChangeRequest request,
+  }) async {
+    final exception = this.exception;
+    if (exception != null) {
+      throw exception;
+    }
+    changedCurrentAddress = request.currentAddress;
+    changedNewAddress = request.newAddress;
+    return ModbusAddressChangeResult(
+      currentAddress: request.currentAddress,
+      newAddress: request.newAddress,
+    );
   }
 }

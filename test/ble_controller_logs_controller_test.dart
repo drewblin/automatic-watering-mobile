@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
-import 'package:automatic_watering_mobile/features/local_controller/diagnostics_log.dart';
+import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';

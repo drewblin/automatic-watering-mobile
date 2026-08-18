@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../ble/ble_constants.dart';
 import '../../ble/ble_models.dart';
 import '../../ble/ble_service.dart';
-import '../../local_controller/diagnostics_log.dart';
+import '../../diagnostics/diagnostics_log.dart';
 import '../../watering_hubs/watering_hub.dart';
 
 typedef Clock = DateTime Function();

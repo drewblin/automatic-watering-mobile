@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../local_controller/diagnostics_log.dart';
+import '../../diagnostics/diagnostics_log.dart';
 
 class DiagnosticsLogTab extends StatefulWidget {
   const DiagnosticsLogTab({
