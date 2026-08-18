@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Automatic watering app icon">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="80" x2="896" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#14532d"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="360" y1="130" x2="664" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e0fbff"/>
+      <stop offset="1" stop-color="#7dd3fc"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="300" y1="520" x2="724" y2="770" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#dcfce7"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#052e16" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <path
+    fill="url(#drop)"
+    filter="url(#shadow)"
+    d="M512 104c-72 92-150 207-150 300 0 90 66 154 150 154s150-64 150-154c0-93-78-208-150-300z"/>
+  <path
+    fill="#ffffff"
+    fill-opacity="0.48"
+    d="M444 236c-29 42-47 79-53 112-3 23 28 32 38 10 15-32 35-64 60-97 14-18-32-44-45-25z"/>
+  <path
+    fill="none"
+    stroke="#dcfce7"
+    stroke-width="50"
+    stroke-linecap="round"
+    d="M512 790V620"/>
+  <path
+    fill="url(#leaf)"
+    d="M480 690c-114 6-195-55-230-168 120-24 223 21 285 122-11 28-27 44-55 46z"/>
+  <path
+    fill="url(#leaf)"
+    d="M544 690c114 6 195-55 230-168-120-24-223 21-285 122 11 28 27 44 55 46z"/>
+  <path
+    fill="none"
+    stroke="#bbf7d0"
+    stroke-width="24"
+    stroke-linecap="round"
+    d="M322 552c76 31 136 72 190 120m190-120c-76 31-136 72-190 120"/>
+</svg>

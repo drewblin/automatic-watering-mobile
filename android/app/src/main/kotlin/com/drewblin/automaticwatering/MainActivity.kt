@@ -1,4 +1,4 @@
-package com.example.automatic_watering_mobile
+package com.drewblin.automaticwatering
 
 import io.flutter.embedding.android.FlutterActivity
 
