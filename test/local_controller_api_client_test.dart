@@ -83,6 +83,7 @@ void main() {
         request: const ModbusAddressChangeRequest(
           currentAddress: 11,
           newAddress: 12,
+          registerAddress: 256,
         ),
       ),
       throwsA(isA<LocalControllerApiException>()),
@@ -137,17 +138,57 @@ void main() {
       request: const ModbusAddressChangeRequest(
         currentAddress: 11,
         newAddress: 12,
+        registerAddress: 256,
       ),
     );
 
     expect(result.currentAddress, 11);
     expect(result.newAddress, 12);
-    expect(httpClient.lastUri?.path, '/api/service/modbus-address');
+    expect(result.registerAddress, 256);
+    expect(httpClient.lastUri?.path, '/api/modbus/device-address');
     expect(httpClient.lastRequestBody, {
       'currentAddress': 11,
       'newAddress': 12,
+      'registerAddress': 256,
     });
     expect(diagnosticsLog.entries, isEmpty);
+  });
+
+  test('change Modbus address includes optional save register fields',
+      () async {
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final httpClient = _FakeHttpClient(
+      responseBody: {
+        'success': true,
+        'error': null,
+        'data': null,
+      },
+    );
+    final client = HttpLocalControllerApiClient(
+      httpClient: httpClient,
+      diagnosticsLog: diagnosticsLog,
+      timeout: const Duration(seconds: 1),
+    );
+
+    await client.changeModbusAddress(
+      ipAddress: '192.168.1.42',
+      apiAccessToken: 'token',
+      request: const ModbusAddressChangeRequest(
+        currentAddress: 11,
+        newAddress: 12,
+        registerAddress: 256,
+        saveRegisterAddress: 512,
+        saveValue: 1,
+      ),
+    );
+
+    expect(httpClient.lastRequestBody, {
+      'currentAddress': 11,
+      'newAddress': 12,
+      'registerAddress': 256,
+      'saveRegisterAddress': 512,
+      'saveValue': 1,
+    });
   });
 }
 

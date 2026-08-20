@@ -148,7 +148,7 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     return _send(
       request: _ControllerRequest.post(
         ipAddress,
-        '/api/service/modbus-address',
+        '/api/modbus/device-address',
       ),
       apiAccessToken: apiAccessToken,
       body: request.toJson(),
@@ -157,6 +157,7 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
         return ModbusAddressChangeResult(
           currentAddress: request.currentAddress,
           newAddress: request.newAddress,
+          registerAddress: request.registerAddress,
         );
       },
     );

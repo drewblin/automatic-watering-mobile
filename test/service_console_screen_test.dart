@@ -49,6 +49,9 @@ void main() {
 
     expect(find.text('Поточна адреса девайса'), findsOneWidget);
     expect(find.text('Нова адреса'), findsOneWidget);
+    expect(find.text('Адреса register'), findsOneWidget);
+    expect(find.text('Save register address'), findsOneWidget);
+    expect(find.text('Save value'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).at(0), '0');
     await tester.enterText(find.byType(TextField).at(1), '12');
@@ -80,6 +83,54 @@ void main() {
     );
   });
 
+  testWidgets('validates Modbus register address range', (tester) async {
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '11');
+    await tester.enterText(find.byType(TextField).at(1), '12');
+    await tester.enterText(find.byType(TextField).at(2), '65536');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pump();
+
+    expect(
+      find.text('Адреса register має бути від 0 до 65535.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('requires Modbus save register fields together', (tester) async {
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '11');
+    await tester.enterText(find.byType(TextField).at(1), '12');
+    await tester.enterText(find.byType(TextField).at(3), '512');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Save register address і save value потрібно заповнювати разом.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('submits Modbus address change through API', (tester) async {
     final apiClient = FakeLocalControllerApiClient();
 
@@ -101,6 +152,37 @@ void main() {
 
     expect(apiClient.changedCurrentAddress, 11);
     expect(apiClient.changedNewAddress, 12);
+    expect(apiClient.changedRegisterAddress, 256);
+    expect(find.text('Адресу 11 змінено на 12.'), findsOneWidget);
+  });
+
+  testWidgets('submits Modbus address change with save register through API',
+      (tester) async {
+    final apiClient = FakeLocalControllerApiClient();
+
+    await tester.pumpWidget(
+      _TestApp(
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+        bleService: FakeBleService(),
+        localControllerApiClient: apiClient,
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ),
+    );
+
+    await tester.tap(find.text('Modbus адреса'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '11');
+    await tester.enterText(find.byType(TextField).at(1), '12');
+    await tester.enterText(find.byType(TextField).at(3), '512');
+    await tester.enterText(find.byType(TextField).at(4), '1');
+    await _tapChangeAddressFormButton(tester);
+    await tester.pumpAndSettle();
+
+    expect(apiClient.changedCurrentAddress, 11);
+    expect(apiClient.changedNewAddress, 12);
+    expect(apiClient.changedRegisterAddress, 256);
+    expect(apiClient.changedSaveRegisterAddress, 512);
+    expect(apiClient.changedSaveValue, 1);
     expect(find.text('Адресу 11 змінено на 12.'), findsOneWidget);
   });
 
@@ -512,6 +594,9 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
   final LocalControllerApiException? exception;
   int? changedCurrentAddress;
   int? changedNewAddress;
+  int? changedRegisterAddress;
+  int? changedSaveRegisterAddress;
+  int? changedSaveValue;
 
   @override
   Future<void> checkSettingsAccess({
@@ -562,9 +647,13 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     }
     changedCurrentAddress = request.currentAddress;
     changedNewAddress = request.newAddress;
+    changedRegisterAddress = request.registerAddress;
+    changedSaveRegisterAddress = request.saveRegisterAddress;
+    changedSaveValue = request.saveValue;
     return ModbusAddressChangeResult(
       currentAddress: request.currentAddress,
       newAddress: request.newAddress,
+      registerAddress: request.registerAddress,
     );
   }
 }

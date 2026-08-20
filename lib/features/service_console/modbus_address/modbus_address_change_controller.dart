@@ -47,6 +47,9 @@ class ModbusAddressChangeController extends ChangeNotifier {
   Future<bool> submit({
     required String currentAddressText,
     required String newAddressText,
+    required String registerAddressText,
+    required String saveRegisterAddressText,
+    required String saveValueText,
   }) async {
     if (_state.isSubmitting) {
       return false;
@@ -55,6 +58,9 @@ class ModbusAddressChangeController extends ChangeNotifier {
     final request = _buildRequest(
       currentAddressText: currentAddressText,
       newAddressText: newAddressText,
+      registerAddressText: registerAddressText,
+      saveRegisterAddressText: saveRegisterAddressText,
+      saveValueText: saveValueText,
     );
     if (request == null) {
       return false;
@@ -110,6 +116,9 @@ class ModbusAddressChangeController extends ChangeNotifier {
   ModbusAddressChangeRequest? _buildRequest({
     required String currentAddressText,
     required String newAddressText,
+    required String registerAddressText,
+    required String saveRegisterAddressText,
+    required String saveValueText,
   }) {
     final currentAddress = _readAddress(currentAddressText);
     if (currentAddress == null) {
@@ -137,9 +146,50 @@ class ModbusAddressChangeController extends ChangeNotifier {
       return null;
     }
 
+    final registerAddress = _readUint16(registerAddressText);
+    if (registerAddress == null) {
+      _setState(const ModbusAddressChangeState(
+        status: ModbusAddressChangeStatus.invalid,
+        message: 'Адреса register має бути від 0 до 65535.',
+      ));
+      return null;
+    }
+
+    final hasSaveRegisterAddress = saveRegisterAddressText.trim().isNotEmpty;
+    final hasSaveValue = saveValueText.trim().isNotEmpty;
+    if (hasSaveRegisterAddress != hasSaveValue) {
+      _setState(const ModbusAddressChangeState(
+        status: ModbusAddressChangeStatus.invalid,
+        message:
+            'Save register address і save value потрібно заповнювати разом.',
+      ));
+      return null;
+    }
+
+    final int? saveRegisterAddress;
+    final int? saveValue;
+    if (hasSaveRegisterAddress) {
+      saveRegisterAddress = _readUint16(saveRegisterAddressText);
+      saveValue = _readUint16(saveValueText);
+      if (saveRegisterAddress == null || saveValue == null) {
+        _setState(const ModbusAddressChangeState(
+          status: ModbusAddressChangeStatus.invalid,
+          message:
+              'Save register address і save value мають бути від 0 до 65535.',
+        ));
+        return null;
+      }
+    } else {
+      saveRegisterAddress = null;
+      saveValue = null;
+    }
+
     return ModbusAddressChangeRequest(
       currentAddress: currentAddress,
       newAddress: newAddress,
+      registerAddress: registerAddress,
+      saveRegisterAddress: saveRegisterAddress,
+      saveValue: saveValue,
     );
   }
 
@@ -152,6 +202,14 @@ class ModbusAddressChangeController extends ChangeNotifier {
 int? _readAddress(String value) {
   final parsed = int.tryParse(value.trim());
   if (parsed == null || parsed < 1 || parsed > 247) {
+    return null;
+  }
+  return parsed;
+}
+
+int? _readUint16(String value) {
+  final parsed = int.tryParse(value.trim());
+  if (parsed == null || parsed < 0 || parsed > 65535) {
     return null;
   }
   return parsed;

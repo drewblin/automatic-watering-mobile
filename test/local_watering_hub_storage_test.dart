@@ -240,6 +240,7 @@ class RecordingStartupApiClient implements LocalControllerApiClient {
     return ModbusAddressChangeResult(
       currentAddress: request.currentAddress,
       newAddress: request.newAddress,
+      registerAddress: request.registerAddress,
     );
   }
 }

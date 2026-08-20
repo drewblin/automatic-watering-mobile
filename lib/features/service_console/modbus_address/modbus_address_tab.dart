@@ -18,6 +18,9 @@ class ModbusAddressTab extends StatefulWidget {
 class _ModbusAddressTabState extends State<ModbusAddressTab> {
   final _currentAddressController = TextEditingController();
   final _newAddressController = TextEditingController();
+  final _registerAddressController = TextEditingController(text: '256');
+  final _saveRegisterAddressController = TextEditingController();
+  final _saveValueController = TextEditingController();
 
   @override
   void initState() {
@@ -39,6 +42,9 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
     widget.controller.removeListener(_refresh);
     _currentAddressController.dispose();
     _newAddressController.dispose();
+    _registerAddressController.dispose();
+    _saveRegisterAddressController.dispose();
+    _saveValueController.dispose();
     super.dispose();
   }
 
@@ -52,6 +58,9 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
     final success = await widget.controller.submit(
       currentAddressText: _currentAddressController.text,
       newAddressText: _newAddressController.text,
+      registerAddressText: _registerAddressController.text,
+      saveRegisterAddressText: _saveRegisterAddressController.text,
+      saveValueText: _saveValueController.text,
     );
     if (!mounted || !success) {
       return;
@@ -92,6 +101,42 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
           controller: _newAddressController,
           decoration: const InputDecoration(
             labelText: 'Нова адреса',
+            border: OutlineInputBorder(),
+          ),
+          enabled: !state.isSubmitting,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) => widget.controller.clearValidationMessage(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _registerAddressController,
+          decoration: const InputDecoration(
+            labelText: 'Адреса register',
+            border: OutlineInputBorder(),
+          ),
+          enabled: !state.isSubmitting,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) => widget.controller.clearValidationMessage(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _saveRegisterAddressController,
+          decoration: const InputDecoration(
+            labelText: 'Save register address',
+            border: OutlineInputBorder(),
+          ),
+          enabled: !state.isSubmitting,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) => widget.controller.clearValidationMessage(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _saveValueController,
+          decoration: const InputDecoration(
+            labelText: 'Save value',
             border: OutlineInputBorder(),
           ),
           enabled: !state.isSubmitting,
