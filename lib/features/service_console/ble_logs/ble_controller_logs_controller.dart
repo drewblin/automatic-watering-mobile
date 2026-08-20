@@ -268,6 +268,10 @@ class BleControllerLogsController extends ChangeNotifier {
     _setState(_state.copyWith(records: const []));
   }
 
+  Future<void> connect() {
+    return syncWithActiveController();
+  }
+
   Future<void> _subscribe(String deviceId, int attempt) async {
     if (_isDisposed || attempt != _connectionAttempt) {
       return;

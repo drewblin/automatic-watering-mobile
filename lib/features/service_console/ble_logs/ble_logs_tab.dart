@@ -49,6 +49,8 @@ class _BleLogsTabState extends State<BleLogsTab> {
       children: [
         _BleLogsActions(
           state: state,
+          onConnect: widget.controller.connect,
+          onDisconnect: widget.controller.disconnect,
           onClear: widget.controller.clear,
         ),
         _BleLogsStatus(state: state),
@@ -63,10 +65,14 @@ class _BleLogsTabState extends State<BleLogsTab> {
 class _BleLogsActions extends StatelessWidget {
   const _BleLogsActions({
     required this.state,
+    required this.onConnect,
+    required this.onDisconnect,
     required this.onClear,
   });
 
   final BleControllerLogsState state;
+  final VoidCallback onConnect;
+  final VoidCallback onDisconnect;
   final VoidCallback onClear;
 
   @override
@@ -78,6 +84,16 @@ class _BleLogsActions extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            IconButton(
+              tooltip: 'Підключитися',
+              onPressed: state.canConnect ? onConnect : null,
+              icon: const Icon(Icons.bluetooth_connected),
+            ),
+            IconButton(
+              tooltip: 'Відключитися',
+              onPressed: state.canDisconnect ? onDisconnect : null,
+              icon: const Icon(Icons.bluetooth_disabled),
+            ),
             IconButton(
               tooltip: 'Очистити',
               onPressed: state.canClear ? onClear : null,
