@@ -222,7 +222,7 @@ void main() {
     expect(find.text('Діагностика'), findsOneWidget);
   });
 
-  testWidgets('retries startup settings load after fatal error',
+  testWidgets('manually restarts onboarding after saved IP failure',
       (tester) async {
     final createdAt = DateTime.utc(2026);
     final storage = InMemoryWateringHubStorage()
@@ -270,7 +270,9 @@ void main() {
     expect(find.byTooltip('Сервісна консоль'), findsOneWidget);
     expect(find.text('Налаштування контролера'), findsNothing);
 
-    await tester.tap(find.text('Повторити'));
+    await tester.tap(find.text('Повторити onboarding'));
+    await tester.pump();
+    await tester.pump();
     await tester.pump();
     await tester.pump();
 
@@ -320,7 +322,7 @@ void main() {
     expect(find.text('Додати контролер'), findsOneWidget);
   });
 
-  testWidgets('starts onboarding when completed hub has no saved token',
+  testWidgets('recovers completed hub when saved token is missing',
       (tester) async {
     final createdAt = DateTime.utc(2026);
     final storage = InMemoryWateringHubStorage()
@@ -359,9 +361,13 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(appController.state.startupStatus, AppStartupStatus.onboarding);
-    expect(client.getCalls, 0);
-    expect(find.text('Додати контролер'), findsOneWidget);
+    await tester.pump();
+    await tester.pump();
+
+    expect(appController.state.startupStatus, AppStartupStatus.ready);
+    expect(client.getCalls, greaterThanOrEqualTo(1));
+    expect(find.text('Додати контролер'), findsNothing);
+    expect(find.text('Automatic Watering Hub'), findsOneWidget);
   });
 }
 

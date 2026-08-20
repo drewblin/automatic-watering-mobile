@@ -6,6 +6,7 @@ class BleOnboardingSession {
 
   List<BleDiscoveredDevice> devices = const [];
   WateringHub? activeWateringHub;
+  bool isRecoveringExistingHub = false;
   bool isBleConnected = false;
   bool isDisposed = false;
   int availabilityRequestId = 0;

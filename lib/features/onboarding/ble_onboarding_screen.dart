@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../watering_hubs/watering_hub.dart';
 import 'ble_onboarding_controller.dart';
 import 'ble_controller_access_screen.dart';
 import 'ble_discovery_screen.dart';
@@ -10,11 +11,13 @@ import 'ble_wifi_setup_screen.dart';
 class BleOnboardingScreen extends StatefulWidget {
   const BleOnboardingScreen({
     required this.controller,
+    required this.activeWateringHub,
     required this.onCompleted,
     super.key,
   });
 
   final BleOnboardingController controller;
+  final WateringHub? activeWateringHub;
   final Future<void> Function() onCompleted;
 
   @override
@@ -30,7 +33,7 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
       if (!mounted) {
         return;
       }
-      widget.controller.checkAvailability();
+      widget.controller.start(activeWateringHub: widget.activeWateringHub);
     });
   }
 
@@ -38,10 +41,19 @@ class _BleOnboardingScreenState extends State<BleOnboardingScreen> {
   void didUpdateWidget(BleOnboardingScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller == widget.controller) {
-      return;
+      if (oldWidget.activeWateringHub?.id == widget.activeWateringHub?.id) {
+        return;
+      }
+    } else {
+      oldWidget.controller.removeListener(_completeOnboardingIfReady);
+      widget.controller.addListener(_completeOnboardingIfReady);
     }
-    oldWidget.controller.removeListener(_completeOnboardingIfReady);
-    widget.controller.addListener(_completeOnboardingIfReady);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      widget.controller.start(activeWateringHub: widget.activeWateringHub);
+    });
   }
 
   @override

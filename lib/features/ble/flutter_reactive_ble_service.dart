@@ -136,7 +136,18 @@ class FlutterReactiveBleService implements BleService {
       },
     );
 
-    await completer.future;
+    try {
+      await completer.future;
+    } catch (_) {
+      if (_connectionSubscription != null) {
+        await _connectionSubscription?.cancel();
+        _connectionSubscription = null;
+      }
+      if (_connectedDeviceId == device.id) {
+        _connectedDeviceId = null;
+      }
+      rethrow;
+    }
   }
 
   @override

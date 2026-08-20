@@ -5,8 +5,10 @@ import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import '../../features/diagnostics/diagnostics_log.dart';
 import '../../features/local_controller/local_controller_api_client.dart';
+import '../../features/watering_hubs/watering_hub.dart';
 import 'ble_controller_access_flow.dart';
 import 'ble_discovery_flow.dart';
+import 'ble_onboarding_errors.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
 import 'ble_onboarding_state_store.dart';
@@ -65,6 +67,7 @@ class BleOnboardingController extends ChangeNotifier {
       retryDelay: controllerAccessRetryDelay,
       maxAttempts: maxControllerAccessAttempts,
     );
+    _diagnosticsLog = diagnosticsLog;
     _stateStore.addListener(notifyListeners);
   }
 
@@ -75,10 +78,76 @@ class BleOnboardingController extends ChangeNotifier {
   late final BlePairingFlow _pairing;
   late final BleWifiProvisioningFlow _wifi;
   late final BleControllerAccessFlow _access;
+  late final DiagnosticsLog _diagnosticsLog;
 
   BleOnboardingState get state => _stateStore.state;
 
   Future<void> checkAvailability() => _discovery.checkAvailability();
+
+  Future<void> start({
+    required WateringHub? activeWateringHub,
+  }) async {
+    if (activeWateringHub?.isOnboardingComplete ?? false) {
+      await recoverSavedController(activeWateringHub!);
+      return;
+    }
+    _session.activeWateringHub = activeWateringHub;
+    _session.isRecoveringExistingHub = false;
+    await checkAvailability();
+  }
+
+  Future<void> recoverSavedController(WateringHub hub) async {
+    _session.activeWateringHub = hub;
+    _session.isRecoveringExistingHub = true;
+    final availability = await _bleService.checkAvailability();
+    if (availability != BleAvailability.ready) {
+      _stateStore.setState(BluetoothUnavailable(availability: availability));
+      return;
+    }
+
+    final device = BleDiscoveredDevice(
+      id: hub.bleDeviceId,
+      name: hub.displayName,
+      rssi: null,
+      isLikelyAutomaticWateringHub: true,
+      advertisedServiceUuids: const {},
+    );
+    _session.devices = [device];
+    _stateStore.setState(
+      ConnectingDevice(foundDevices: _session.devices, device: device),
+    );
+
+    try {
+      await _bleService.reconnect(device);
+      _stateStore.setState(
+        PairingInProgress(foundDevices: _session.devices, device: device),
+      );
+      final services = await _bleService.pairAndDiscoverServices(device);
+      if (!services.hasAutomaticWateringService) {
+        throw StateError('Automatic Watering BLE service was not discovered');
+      }
+      _session.isBleConnected = true;
+    } catch (error) {
+      _session.isBleConnected = false;
+      final bleError = bleOnboardingBleError(
+        message:
+            'Не вдалося підключитися до збереженого контролера через BLE. Запустіть пошук і виберіть контролер заново.',
+        error: error,
+        diagnosticsLog: _diagnosticsLog,
+      );
+      _session.devices = const [];
+      _stateStore.setState(ReadyToScan(error: bleError));
+      return;
+    }
+
+    _stateStore.setState(
+      AccessSetupReady(
+        device: device,
+        credentials: WifiCredentials.empty(),
+      ),
+    );
+    await _access.bootstrapControllerAccess();
+  }
 
   Future<void> requestPermissions() => _discovery.requestPermissions();
 

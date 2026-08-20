@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:automatic_watering_mobile/app/app_startup_service.dart';
 import 'package:automatic_watering_mobile/app/app_state.dart';
 import 'package:automatic_watering_mobile/app/app_state_store.dart';
+import 'package:automatic_watering_mobile/app/fatal_app_exception.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
@@ -88,6 +89,52 @@ void main() {
       contains('watering_hubs.plan.hub-aa-bb-cc'),
     );
   });
+
+  test('startup fails when saved controller IP is unreachable', () async {
+    final hub = _hubWithoutPlainToken();
+    SharedPreferences.setMockInitialValues({
+      'watering_hubs.active': jsonEncode(hub.toJson()),
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final stateStore = AppStateStore();
+    final tokenStorage = InMemoryWateringHubTokenStorage()
+      ..tokens['hub-aa-bb-cc'] = validToken;
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final client = RecordingStartupApiClient(
+      getException: const LocalControllerApiException(),
+    );
+    final startup = AppStartupService(
+      stateStore: stateStore,
+      wateringHubStorage: SharedPreferencesWateringHubStorage(preferences),
+      tokenStorage: tokenStorage,
+      controllerSettingsRepository: ControllerSettingsRepository(
+        apiClient: client,
+      ),
+      diagnosticsLog: diagnosticsLog,
+    );
+
+    await expectLater(
+      startup.initialize(),
+      throwsA(isA<FatalAppException>()),
+    );
+
+    expect(stateStore.state.startupStatus, AppStartupStatus.initializing);
+    expect(stateStore.state.activeWateringHub?.id, 'hub-aa-bb-cc');
+    expect(stateStore.state.activeWateringHub?.apiAccessToken, validToken);
+    expect(preferences.getString('watering_hubs.active'), isNotNull);
+    expect(tokenStorage.tokens['hub-aa-bb-cc'], validToken);
+    expect(diagnosticsLog.entries, isEmpty);
+
+    stateStore.setState(
+      AppState.readyForOnboarding(
+        activeWateringHub: stateStore.state.activeWateringHub,
+      ),
+    );
+
+    expect(stateStore.state.startupStatus, AppStartupStatus.onboarding);
+    expect(stateStore.state.activeWateringHub?.id, 'hub-aa-bb-cc');
+    expect(stateStore.state.activeWateringHub?.apiAccessToken, validToken);
+  });
 }
 
 const validToken =
@@ -109,6 +156,9 @@ WateringHub _hubWithoutPlainToken() {
 }
 
 class RecordingStartupApiClient implements LocalControllerApiClient {
+  RecordingStartupApiClient({this.getException});
+
+  final LocalControllerApiException? getException;
   int getCalls = 0;
 
   @override
@@ -123,6 +173,10 @@ class RecordingStartupApiClient implements LocalControllerApiClient {
     required String apiAccessToken,
   }) async {
     getCalls += 1;
+    final getException = this.getException;
+    if (getException != null) {
+      throw getException;
+    }
     return SettingsResponseData(
       settings: ControllerSettings(
         globalSettings: GlobalSettings(

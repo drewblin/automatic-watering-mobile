@@ -356,7 +356,10 @@ void main() {
     );
     final appController = composition.appController;
     await appController.initialize();
-    final bleService = FakeBleService(failReconnect: true);
+    final bleService = FakeBleService(
+      currentWifi: const WifiCredentials(ssid: 'Garden', password: ''),
+      failReconnect: true,
+    );
     final controller = BleOnboardingController(
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
@@ -626,6 +629,165 @@ void main() {
     );
   });
 
+  test('recovery reconnects saved controller over BLE and refreshes IP',
+      () async {
+    final createdAt = DateTime.utc(2026);
+    final storage = InMemoryWateringHubStorage()
+      ..activeHub = WateringHub(
+        id: 'hub-aa-bb-cc',
+        displayName: 'Saved Hub',
+        bleDeviceId: 'AA:BB:CC',
+        lastKnownIpAddress: '192.168.1.10',
+        apiAccessToken: null,
+        serverDeviceId: 'server-device',
+        onboardingCompletedAt: createdAt,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      );
+    final tokenStorage = InMemoryWateringHubTokenStorage()
+      ..tokens['hub-aa-bb-cc'] = validToken;
+    final localClient = FakeLocalControllerApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+      localControllerApiClient: localClient,
+    );
+    await composition.appController.initialize();
+    final bleService = FakeBleService(
+      wifiIpAddress: const ControllerIpAddress('192.168.1.42'),
+      apiAccessToken: const ControllerApiAccessToken(otherValidToken),
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: localClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      controllerAccessRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
+    );
+
+    await controller.recoverSavedController(
+      composition.appController.state.activeWateringHub!,
+    );
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(bleService.reconnectCalls, 1);
+    expect(storage.activeHub?.id, 'hub-aa-bb-cc');
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
+    expect(storage.activeHub?.serverDeviceId, 'server-device');
+    expect(storage.activeHub?.apiAccessToken, isNull);
+    expect(tokenStorage.tokens['hub-aa-bb-cc'], otherValidToken);
+    expect(localClient.checkedIpAddress, '192.168.1.42');
+    expect(localClient.checkedToken, otherValidToken);
+  });
+
+  test('recovery waits for explicit scan when saved controller BLE unavailable',
+      () async {
+    final createdAt = DateTime.utc(2026);
+    final hub = WateringHub(
+      id: 'hub-aa-bb-cc',
+      displayName: 'Saved Hub',
+      bleDeviceId: 'AA:BB:CC',
+      lastKnownIpAddress: '192.168.1.10',
+      apiAccessToken: validToken,
+      serverDeviceId: null,
+      onboardingCompletedAt: createdAt,
+      createdAt: createdAt,
+      updatedAt: createdAt,
+    );
+    final composition = TestAppComposition(
+      localControllerApiClient: FakeLocalControllerApiClient(),
+    );
+    final bleService = FakeBleService(
+      currentWifi: const WifiCredentials(ssid: 'Garden', password: ''),
+      failReconnect: true,
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: FakeLocalControllerApiClient(),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      reconnectRetryDelay: Duration.zero,
+    );
+
+    await controller.recoverSavedController(hub);
+
+    expect(controller.state, isA<ReadyToScan>());
+    expect(controller.state.bleError?.message, contains('Запустіть пошук'));
+    expect(controller.state.devices, isEmpty);
+    expect(bleService.startScanCalls, 0);
+
+    await controller.startScan();
+
+    expect(controller.state, isA<DiscoveringDevices>());
+    expect(bleService.startScanCalls, 1);
+  });
+
+  test('recovery keeps existing hub when controller BLE id changed', () async {
+    final createdAt = DateTime.utc(2026);
+    final storage = InMemoryWateringHubStorage()
+      ..activeHub = WateringHub(
+        id: 'hub-aa-bb-cc',
+        displayName: 'Saved Hub',
+        bleDeviceId: 'AA:BB:CC',
+        lastKnownIpAddress: '192.168.1.10',
+        apiAccessToken: null,
+        serverDeviceId: 'server-device',
+        onboardingCompletedAt: createdAt,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      );
+    final tokenStorage = InMemoryWateringHubTokenStorage()
+      ..tokens['hub-aa-bb-cc'] = validToken;
+    final localClient = FakeLocalControllerApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+      localControllerApiClient: localClient,
+    );
+    await composition.appController.initialize();
+    final bleService = FakeBleService(
+      currentWifi: const WifiCredentials(ssid: 'Garden', password: ''),
+      failReconnect: true,
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      localControllerApiClient: localClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      reconnectRetryDelay: Duration.zero,
+      controllerAccessRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
+    );
+    const newDevice = BleDiscoveredDevice(
+      id: 'DD:EE:FF',
+      name: 'Same Controller',
+      rssi: -48,
+      isLikelyAutomaticWateringHub: true,
+      advertisedServiceUuids: {AutomaticWateringBleConstants.serviceUuid},
+    );
+
+    await controller.recoverSavedController(
+      composition.appController.state.activeWateringHub!,
+    );
+    bleService.failReconnect = false;
+    controller.selectDevice(newDevice);
+    await controller.connectSelectedDevice();
+    controller.skipWifiSettings();
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(storage.activeHub?.id, 'hub-aa-bb-cc');
+    expect(storage.activeHub?.displayName, 'Same Controller');
+    expect(storage.activeHub?.bleDeviceId, 'DD:EE:FF');
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
+    expect(storage.activeHub?.serverDeviceId, 'server-device');
+    expect(tokenStorage.tokens['hub-aa-bb-cc'], validToken);
+  });
+
   test('controller IP and token parsing trusts controller values', () {
     expect(
       ControllerIpAddress.fromJson({'ipAddress': 'controller.local'}).value,
@@ -698,10 +860,12 @@ class FakeBleService implements BleService {
   final ControllerApiAccessToken apiAccessToken;
   final bool hasAutomaticWateringService;
   final bool restartScheduled;
-  final bool failReconnect;
+  bool failReconnect;
   WifiCredentials? savedWifiCredentials;
+  int connectCalls = 0;
   int disconnectCalls = 0;
   int reconnectCalls = 0;
+  int startScanCalls = 0;
   int readWifiIpAddressCalls = 0;
   int readApiAccessTokenCalls = 0;
   bool hangWifiSettingsRead = false;
@@ -717,13 +881,17 @@ class FakeBleService implements BleService {
   Future<BleAvailability> requestPermissions() async => BleAvailability.ready;
 
   @override
-  Future<void> startScan() async {}
+  Future<void> startScan() async {
+    startScanCalls += 1;
+  }
 
   @override
   Future<void> stopScan() async {}
 
   @override
-  Future<void> connect(BleDiscoveredDevice device) async {}
+  Future<void> connect(BleDiscoveredDevice device) async {
+    connectCalls += 1;
+  }
 
   @override
   Future<void> reconnect(BleDiscoveredDevice device) async {

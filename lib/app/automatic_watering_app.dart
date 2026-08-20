@@ -81,7 +81,11 @@ class _AutomaticWateringAppState extends State<AutomaticWateringApp> {
   }
 
   void _restartOnboarding() {
-    // todo реалізувати повторний onboarding для вже доданого контролера.
+    widget.fatalErrorListenable?.value = null;
+    setState(() {
+      _fatalError = null;
+    });
+    widget.appController.restartOnboarding();
   }
 
   void _handleExternalFatalError() {

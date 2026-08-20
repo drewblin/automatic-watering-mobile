@@ -29,6 +29,14 @@ class AppController extends ChangeNotifier {
 
   Future<void> initialize() => _startup.initialize();
 
+  void restartOnboarding() {
+    _stateStore.setState(
+      AppState.readyForOnboarding(
+        activeWateringHub: _stateStore.state.activeWateringHub,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _stateStore.removeListener(notifyListeners);

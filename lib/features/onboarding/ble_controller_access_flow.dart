@@ -231,12 +231,15 @@ class BleControllerAccessFlow {
   Future<void> _savePairedHub(BleDiscoveredDevice device) async {
     final now = DateTime.now().toUtc();
     final activeHub = _session.activeWateringHub;
-    final hub = activeHub?.bleDeviceId == device.id
-        ? activeHub!.copyWith(
-            displayName: device.displayName,
-            updatedAt: now,
-          )
-        : _newHubForDevice(device, now);
+    final hub = activeHub == null
+        ? _newHubForDevice(device, now)
+        : activeHub.bleDeviceId == device.id || _session.isRecoveringExistingHub
+            ? activeHub.copyWith(
+                displayName: device.displayName,
+                bleDeviceId: device.id,
+                updatedAt: now,
+              )
+            : _newHubForDevice(device, now);
     await _onboardingStorage.saveActiveWateringHub(hub);
     _session.activeWateringHub = hub;
   }

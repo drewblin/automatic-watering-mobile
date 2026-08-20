@@ -19,10 +19,10 @@ class AppState {
     required List<DeviceObject> deviceObjects,
   }) : deviceObjects = List<DeviceObject>.unmodifiable(deviceObjects);
 
-  factory AppState.loading() {
+  factory AppState.loading({WateringHub? activeWateringHub}) {
     return AppState(
       startupStatus: AppStartupStatus.initializing,
-      activeWateringHub: null,
+      activeWateringHub: activeWateringHub,
       activePlanSchema: null,
       settings: null,
       deviceObjects: const [],

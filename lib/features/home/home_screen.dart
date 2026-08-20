@@ -48,6 +48,7 @@ class HomeScreen extends StatelessWidget {
           AppStartupStatus.initializing => const CircularProgressIndicator(),
           AppStartupStatus.onboarding => BleOnboardingScreen(
               controller: bleOnboardingController,
+              activeWateringHub: state.activeWateringHub,
               onCompleted: onOnboardingComplete,
             ),
           AppStartupStatus.ready => HomeDashboard(
