@@ -25,26 +25,29 @@ class FatalErrorScreen extends StatelessWidget {
         title: 'Автоматичний полив',
         serviceConsoleDependencies: serviceConsoleDependencies,
       ),
-      body: Center(
-        child: StatusPanel(
-          title: 'Помилка запуску',
-          subtitle: error.toString(),
-          action: Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Повторити'),
-              ),
-              OutlinedButton.icon(
-                onPressed: onRestartOnboarding,
-                icon: const Icon(Icons.settings_backup_restore),
-                label: const Text('Повторити onboarding'),
-              ),
-            ],
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: StatusPanel(
+            title: 'Помилка запуску',
+            subtitle: error.toString(),
+            action: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Повторити'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onRestartOnboarding,
+                  icon: const Icon(Icons.settings_backup_restore),
+                  label: const Text('Повторити onboarding'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

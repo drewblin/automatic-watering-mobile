@@ -45,19 +45,22 @@ class _BleLogsTabState extends State<BleLogsTab> {
   @override
   Widget build(BuildContext context) {
     final state = widget.controller.state;
-    return Column(
-      children: [
-        _BleLogsActions(
-          state: state,
-          onConnect: widget.controller.connect,
-          onDisconnect: widget.controller.disconnect,
-          onClear: widget.controller.clear,
-        ),
-        _BleLogsStatus(state: state),
-        Expanded(
-          child: _BleLogsList(records: state.records),
-        ),
-      ],
+    return SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          _BleLogsActions(
+            state: state,
+            onConnect: widget.controller.connect,
+            onDisconnect: widget.controller.disconnect,
+            onClear: widget.controller.clear,
+          ),
+          _BleLogsStatus(state: state),
+          Expanded(
+            child: _BleLogsList(records: state.records),
+          ),
+        ],
+      ),
     );
   }
 }

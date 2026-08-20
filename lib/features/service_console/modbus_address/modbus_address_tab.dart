@@ -81,98 +81,101 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
     final resultMessage =
         state.status == ModbusAddressChangeStatus.invalid ? null : message;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const SizedBox(height: 16),
-        TextField(
-          controller: _currentAddressController,
-          decoration: const InputDecoration(
-            labelText: 'Поточна адреса девайса',
-            border: OutlineInputBorder(),
-          ),
-          enabled: !state.isSubmitting,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) => widget.controller.clearValidationMessage(),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _newAddressController,
-          decoration: const InputDecoration(
-            labelText: 'Нова адреса',
-            border: OutlineInputBorder(),
-          ),
-          enabled: !state.isSubmitting,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) => widget.controller.clearValidationMessage(),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _registerAddressController,
-          decoration: const InputDecoration(
-            labelText: 'Адреса register',
-            border: OutlineInputBorder(),
-          ),
-          enabled: !state.isSubmitting,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) => widget.controller.clearValidationMessage(),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _saveRegisterAddressController,
-          decoration: const InputDecoration(
-            labelText: 'Save register address',
-            border: OutlineInputBorder(),
-          ),
-          enabled: !state.isSubmitting,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) => widget.controller.clearValidationMessage(),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _saveValueController,
-          decoration: const InputDecoration(
-            labelText: 'Save value',
-            border: OutlineInputBorder(),
-          ),
-          enabled: !state.isSubmitting,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          onChanged: (_) => widget.controller.clearValidationMessage(),
-        ),
-        if (validationMessage != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            validationMessage,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: state.isSubmitting ? null : _submit,
-            icon: state.isSubmitting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.swap_horiz),
-            label: const Text('Змінити адресу'),
-          ),
-        ),
-        if (resultMessage != null) ...[
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
           const SizedBox(height: 16),
-          _OperationResult(
-            message: resultMessage,
-            isSuccess: state.status == ModbusAddressChangeStatus.success,
+          TextField(
+            controller: _currentAddressController,
+            decoration: const InputDecoration(
+              labelText: 'Поточна адреса девайса',
+              border: OutlineInputBorder(),
+            ),
+            enabled: !state.isSubmitting,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => widget.controller.clearValidationMessage(),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _newAddressController,
+            decoration: const InputDecoration(
+              labelText: 'Нова адреса',
+              border: OutlineInputBorder(),
+            ),
+            enabled: !state.isSubmitting,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => widget.controller.clearValidationMessage(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _registerAddressController,
+            decoration: const InputDecoration(
+              labelText: 'Адреса register',
+              border: OutlineInputBorder(),
+            ),
+            enabled: !state.isSubmitting,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => widget.controller.clearValidationMessage(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _saveRegisterAddressController,
+            decoration: const InputDecoration(
+              labelText: 'Save register address',
+              border: OutlineInputBorder(),
+            ),
+            enabled: !state.isSubmitting,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => widget.controller.clearValidationMessage(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _saveValueController,
+            decoration: const InputDecoration(
+              labelText: 'Save value',
+              border: OutlineInputBorder(),
+            ),
+            enabled: !state.isSubmitting,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => widget.controller.clearValidationMessage(),
+          ),
+          if (validationMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              validationMessage,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: state.isSubmitting ? null : _submit,
+              icon: state.isSubmitting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.swap_horiz),
+              label: const Text('Змінити адресу'),
+            ),
+          ),
+          if (resultMessage != null) ...[
+            const SizedBox(height: 16),
+            _OperationResult(
+              message: resultMessage,
+              isSuccess: state.status == ModbusAddressChangeStatus.success,
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

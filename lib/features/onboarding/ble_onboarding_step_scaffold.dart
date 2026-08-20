@@ -15,17 +15,23 @@ class BleOnboardingStepScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text('Додати контролер', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 12),
-        BleOnboardingStateBanner(state: state),
-        for (final child in children) ...[
-          const SizedBox(height: 16),
-          child,
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            'Додати контролер',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          BleOnboardingStateBanner(state: state),
+          for (final child in children) ...[
+            const SizedBox(height: 16),
+            child,
+          ],
         ],
-      ],
+      ),
     );
   }
 }

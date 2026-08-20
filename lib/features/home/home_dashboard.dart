@@ -92,105 +92,110 @@ class _DashboardBody extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: controller.refresh,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          DashboardStatusCard(
-            hubName: hub.displayName,
-            settingsSyncedAt: settings.syncedAt,
-            controllerCurrentTime: controllerTimeText(settings),
-            lastMetricsSyncedAt: controller.lastMetricsSyncedAt,
-            refreshStatus: controller.refreshStatus,
-            errorMessage: controller.refreshErrorMessage,
-            onRefresh: controller.isRefreshing ? null : controller.refresh,
-          ),
-          const SizedBox(height: 16),
-          HomeSection(
-            title: 'Клапани',
-            emptyText: 'Клапани не налаштовані.',
-            children: [
-              for (final valve in valves)
-                ValveCard(
-                  valve: valve,
-                  settings: controllerSettings,
-                  humidity: metrics.soilHumidity(
-                    valve.setting.soilSensorSlaveAddress,
-                  ),
-                  temperature: metrics.soilTemperature(
-                    valve.setting.soilSensorSlaveAddress,
-                  ),
-                  commandState: controller.manualValveState,
-                  onOpen: (seconds) => _openValve(
-                    context,
-                    valve,
-                    seconds,
-                    controllerSettings,
-                  ),
-                ),
-            ],
-          ),
-          HomeSection(
-            title: 'Датчики вологості грунту',
-            emptyText: 'Датчики вологості не налаштовані.',
-            children: [
-              for (final sensor in soilSensors)
-                SensorCard(
-                  title: sensor.setting.name,
-                  metrics: [
-                    MetricDisplay(
-                      label: 'Вологість',
-                      metric: metrics.soilHumidity(sensor.setting.slaveAddress),
-                      suffix: '%',
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            DashboardStatusCard(
+              hubName: hub.displayName,
+              settingsSyncedAt: settings.syncedAt,
+              controllerCurrentTime: controllerTimeText(settings),
+              lastMetricsSyncedAt: controller.lastMetricsSyncedAt,
+              refreshStatus: controller.refreshStatus,
+              errorMessage: controller.refreshErrorMessage,
+              onRefresh: controller.isRefreshing ? null : controller.refresh,
+            ),
+            const SizedBox(height: 16),
+            HomeSection(
+              title: 'Клапани',
+              emptyText: 'Клапани не налаштовані.',
+              children: [
+                for (final valve in valves)
+                  ValveCard(
+                    valve: valve,
+                    settings: controllerSettings,
+                    humidity: metrics.soilHumidity(
+                      valve.setting.soilSensorSlaveAddress,
                     ),
-                    MetricDisplay(
-                      label: 'Температура',
-                      metric: metrics.soilTemperature(
-                        sensor.setting.slaveAddress,
+                    temperature: metrics.soilTemperature(
+                      valve.setting.soilSensorSlaveAddress,
+                    ),
+                    commandState: controller.manualValveState,
+                    onOpen: (seconds) => _openValve(
+                      context,
+                      valve,
+                      seconds,
+                      controllerSettings,
+                    ),
+                  ),
+              ],
+            ),
+            HomeSection(
+              title: 'Датчики вологості грунту',
+              emptyText: 'Датчики вологості не налаштовані.',
+              children: [
+                for (final sensor in soilSensors)
+                  SensorCard(
+                    title: sensor.setting.name,
+                    metrics: [
+                      MetricDisplay(
+                        label: 'Вологість',
+                        metric: metrics.soilHumidity(
+                          sensor.setting.slaveAddress,
+                        ),
+                        suffix: '%',
                       ),
-                      suffix: '°C',
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          HomeSection(
-            title: 'Датчик тиску',
-            emptyText: 'Датчик тиску не налаштований.',
-            children: [
-              for (final sensor in pressureSensors)
-                SensorCard(
-                  title: sensor.setting.name,
-                  metrics: [
-                    MetricDisplay(
-                      label: 'Тиск',
-                      metric: metrics.pressure(sensor.setting.slaveAddress),
-                      suffix: 'bar',
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          HomeSection(
-            title: 'Лічильники води',
-            emptyText: 'Лічильники води не налаштовані.',
-            children: [
-              for (final counter in waterCounters)
-                SensorCard(
-                  title: counter.setting.name,
-                  subtitle: counter.kind == WaterCounterObjectKind.magistral
-                      ? 'Магістральний лічильник'
-                      : 'Лічильник гілки',
-                  metrics: [
-                    MetricDisplay(
-                      label: 'Загалом від старту',
-                      metric: metrics.waterCounter(counter.setting.pin),
-                      suffix: 'л',
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ],
+                      MetricDisplay(
+                        label: 'Температура',
+                        metric: metrics.soilTemperature(
+                          sensor.setting.slaveAddress,
+                        ),
+                        suffix: '°C',
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            HomeSection(
+              title: 'Датчик тиску',
+              emptyText: 'Датчик тиску не налаштований.',
+              children: [
+                for (final sensor in pressureSensors)
+                  SensorCard(
+                    title: sensor.setting.name,
+                    metrics: [
+                      MetricDisplay(
+                        label: 'Тиск',
+                        metric: metrics.pressure(sensor.setting.slaveAddress),
+                        suffix: 'bar',
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            HomeSection(
+              title: 'Лічильники води',
+              emptyText: 'Лічильники води не налаштовані.',
+              children: [
+                for (final counter in waterCounters)
+                  SensorCard(
+                    title: counter.setting.name,
+                    subtitle: counter.kind == WaterCounterObjectKind.magistral
+                        ? 'Магістральний лічильник'
+                        : 'Лічильник гілки',
+                    metrics: [
+                      MetricDisplay(
+                        label: 'Загалом від старту',
+                        metric: metrics.waterCounter(counter.setting.pin),
+                        suffix: 'л',
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

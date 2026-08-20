@@ -58,17 +58,20 @@ class _DiagnosticsLogTabState extends State<DiagnosticsLogTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _DiagnosticsActions(
-          isClearEnabled: _entries.isNotEmpty,
-          onRefresh: _refresh,
-          onClear: _confirmClear,
-        ),
-        Expanded(
-          child: _DiagnosticsLogList(entries: _entries),
-        ),
-      ],
+    return SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          _DiagnosticsActions(
+            isClearEnabled: _entries.isNotEmpty,
+            onRefresh: _refresh,
+            onClear: _confirmClear,
+          ),
+          Expanded(
+            child: _DiagnosticsLogList(entries: _entries),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -179,217 +179,223 @@ class _ControllerSettingsScreenState extends State<ControllerSettingsScreen> {
             ),
           ],
         ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _StatusBanner(
-              message: _flow.message ??
-                  'Налаштування завантажені: ${_formatSyncedAt(widget.settings.syncedAt)}',
-              isError:
-                  _flow.status == ControllerSettingsSaveFlowStatus.saveFailed ||
-                      _flow.status ==
-                          ControllerSettingsSaveFlowStatus.reconnectFailed,
-              onRetry: _flow.status ==
-                      ControllerSettingsSaveFlowStatus.reconnectFailed
-                  ? _save
-                  : null,
-            ),
-            const SizedBox(height: 12),
-            _Section(
-              title: 'Загальні налаштування',
-              children: [
-                _NumberField(
-                  scrollKey:
-                      _keyFor('global.maximumManualValveOpenTimeSeconds'),
-                  enabled: !_busy,
-                  label: 'Максимальний час ручного відкриття клапана, с',
-                  value:
-                      _draft.globalSettings.maximumManualValveOpenTimeSeconds,
-                  error:
-                      _validation['global.maximumManualValveOpenTimeSeconds'],
-                  onChanged: (value) => _changed(() => _draft.globalSettings
-                      .maximumManualValveOpenTimeSeconds = value),
-                ),
-                _NumberField(
-                  scrollKey:
-                      _keyFor('global.startWateringBelowHumidityPercent'),
-                  enabled: !_busy,
-                  label: 'Починати полив нижче вологості, %',
-                  value:
-                      _draft.globalSettings.startWateringBelowHumidityPercent,
-                  error:
-                      _validation['global.startWateringBelowHumidityPercent'],
-                  onChanged: (value) => _changed(() => _draft.globalSettings
-                      .startWateringBelowHumidityPercent = value),
-                ),
-                _NumberField(
-                  scrollKey: _keyFor('global.stopWateringAboveHumidityPercent'),
-                  enabled: !_busy,
-                  label: 'Зупиняти полив вище вологості, %',
-                  value: _draft.globalSettings.stopWateringAboveHumidityPercent,
-                  error: _validation['global.stopWateringAboveHumidityPercent'],
-                  onChanged: (value) => _changed(() => _draft
-                      .globalSettings.stopWateringAboveHumidityPercent = value),
-                ),
-                SegmentedButton<WateringStartMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: WateringStartMode.immediately,
-                      label: Text('Одразу'),
+        body: SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _StatusBanner(
+                message: _flow.message ??
+                    'Налаштування завантажені: ${_formatSyncedAt(widget.settings.syncedAt)}',
+                isError: _flow.status ==
+                        ControllerSettingsSaveFlowStatus.saveFailed ||
+                    _flow.status ==
+                        ControllerSettingsSaveFlowStatus.reconnectFailed,
+                onRetry: _flow.status ==
+                        ControllerSettingsSaveFlowStatus.reconnectFailed
+                    ? _save
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              _Section(
+                title: 'Загальні налаштування',
+                children: [
+                  _NumberField(
+                    scrollKey:
+                        _keyFor('global.maximumManualValveOpenTimeSeconds'),
+                    enabled: !_busy,
+                    label: 'Максимальний час ручного відкриття клапана, с',
+                    value:
+                        _draft.globalSettings.maximumManualValveOpenTimeSeconds,
+                    error:
+                        _validation['global.maximumManualValveOpenTimeSeconds'],
+                    onChanged: (value) => _changed(() => _draft.globalSettings
+                        .maximumManualValveOpenTimeSeconds = value),
+                  ),
+                  _NumberField(
+                    scrollKey:
+                        _keyFor('global.startWateringBelowHumidityPercent'),
+                    enabled: !_busy,
+                    label: 'Починати полив нижче вологості, %',
+                    value:
+                        _draft.globalSettings.startWateringBelowHumidityPercent,
+                    error:
+                        _validation['global.startWateringBelowHumidityPercent'],
+                    onChanged: (value) => _changed(() => _draft.globalSettings
+                        .startWateringBelowHumidityPercent = value),
+                  ),
+                  _NumberField(
+                    scrollKey:
+                        _keyFor('global.stopWateringAboveHumidityPercent'),
+                    enabled: !_busy,
+                    label: 'Зупиняти полив вище вологості, %',
+                    value:
+                        _draft.globalSettings.stopWateringAboveHumidityPercent,
+                    error:
+                        _validation['global.stopWateringAboveHumidityPercent'],
+                    onChanged: (value) => _changed(() => _draft.globalSettings
+                        .stopWateringAboveHumidityPercent = value),
+                  ),
+                  SegmentedButton<WateringStartMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: WateringStartMode.immediately,
+                        label: Text('Одразу'),
+                      ),
+                      ButtonSegment(
+                        value: WateringStartMode.withinWateringWindow,
+                        label: Text('У вікні поливу'),
+                      ),
+                    ],
+                    selected: {_draft.globalSettings.wateringStartMode},
+                    onSelectionChanged: _busy
+                        ? null
+                        : (value) => _changed(() => _draft
+                            .globalSettings.wateringStartMode = value.single),
+                  ),
+                  if (_draft.globalSettings.wateringStartMode ==
+                      WateringStartMode.withinWateringWindow) ...[
+                    _TimeFields(
+                      scrollKey: _keyFor('global.wateringWindowStartTime'),
+                      enabled: !_busy,
+                      title: 'Початок вікна поливу',
+                      hour: _draft.globalSettings.wateringWindowStartHour,
+                      minute: _draft.globalSettings.wateringWindowStartMinute,
+                      error: _validation['global.wateringWindowStartTime'],
+                      onHourChanged: (value) => _changed(() => _draft
+                          .globalSettings.wateringWindowStartHour = value),
+                      onMinuteChanged: (value) => _changed(() => _draft
+                          .globalSettings.wateringWindowStartMinute = value),
                     ),
-                    ButtonSegment(
-                      value: WateringStartMode.withinWateringWindow,
-                      label: Text('У вікні поливу'),
+                    _TimeFields(
+                      scrollKey: _keyFor('global.wateringWindowEndTime'),
+                      enabled: !_busy,
+                      title: 'Кінець вікна поливу',
+                      hour: _draft.globalSettings.wateringWindowEndHour,
+                      minute: _draft.globalSettings.wateringWindowEndMinute,
+                      error: _validation['global.wateringWindowEndTime'],
+                      onHourChanged: (value) => _changed(() =>
+                          _draft.globalSettings.wateringWindowEndHour = value),
+                      onMinuteChanged: (value) => _changed(() => _draft
+                          .globalSettings.wateringWindowEndMinute = value),
                     ),
                   ],
-                  selected: {_draft.globalSettings.wateringStartMode},
-                  onSelectionChanged: _busy
-                      ? null
-                      : (value) => _changed(() => _draft
-                          .globalSettings.wateringStartMode = value.single),
-                ),
-                if (_draft.globalSettings.wateringStartMode ==
-                    WateringStartMode.withinWateringWindow) ...[
-                  _TimeFields(
-                    scrollKey: _keyFor('global.wateringWindowStartTime'),
+                  _NumberField(
+                    scrollKey: _keyFor('global.zoneWateringDurationSeconds'),
                     enabled: !_busy,
-                    title: 'Початок вікна поливу',
-                    hour: _draft.globalSettings.wateringWindowStartHour,
-                    minute: _draft.globalSettings.wateringWindowStartMinute,
-                    error: _validation['global.wateringWindowStartTime'],
-                    onHourChanged: (value) => _changed(() =>
-                        _draft.globalSettings.wateringWindowStartHour = value),
-                    onMinuteChanged: (value) => _changed(() => _draft
-                        .globalSettings.wateringWindowStartMinute = value),
+                    label: 'Тривалість поливу однієї зони, с',
+                    value: _draft.globalSettings.zoneWateringDurationSeconds,
+                    error: _validation['global.zoneWateringDurationSeconds'],
+                    onChanged: (value) => _changed(() => _draft
+                        .globalSettings.zoneWateringDurationSeconds = value),
                   ),
-                  _TimeFields(
-                    scrollKey: _keyFor('global.wateringWindowEndTime'),
+                  _NumberField(
+                    scrollKey: _keyFor('global.zoneWateringRetryDelaySeconds'),
                     enabled: !_busy,
-                    title: 'Кінець вікна поливу',
-                    hour: _draft.globalSettings.wateringWindowEndHour,
-                    minute: _draft.globalSettings.wateringWindowEndMinute,
-                    error: _validation['global.wateringWindowEndTime'],
-                    onHourChanged: (value) => _changed(() =>
-                        _draft.globalSettings.wateringWindowEndHour = value),
-                    onMinuteChanged: (value) => _changed(() =>
-                        _draft.globalSettings.wateringWindowEndMinute = value),
+                    label: 'Затримка перед повторним поливом зони, с',
+                    value: _draft.globalSettings.zoneWateringRetryDelaySeconds,
+                    error: _validation['global.zoneWateringRetryDelaySeconds'],
+                    onChanged: (value) => _changed(() => _draft
+                        .globalSettings.zoneWateringRetryDelaySeconds = value),
                   ),
                 ],
-                _NumberField(
-                  scrollKey: _keyFor('global.zoneWateringDurationSeconds'),
-                  enabled: !_busy,
-                  label: 'Тривалість поливу однієї зони, с',
-                  value: _draft.globalSettings.zoneWateringDurationSeconds,
-                  error: _validation['global.zoneWateringDurationSeconds'],
-                  onChanged: (value) => _changed(() => _draft
-                      .globalSettings.zoneWateringDurationSeconds = value),
-                ),
-                _NumberField(
-                  scrollKey: _keyFor('global.zoneWateringRetryDelaySeconds'),
-                  enabled: !_busy,
-                  label: 'Затримка перед повторним поливом зони, с',
-                  value: _draft.globalSettings.zoneWateringRetryDelaySeconds,
-                  error: _validation['global.zoneWateringRetryDelaySeconds'],
-                  onChanged: (value) => _changed(() => _draft
-                      .globalSettings.zoneWateringRetryDelaySeconds = value),
-                ),
-              ],
-            ),
-            _Section(
-              title: 'Віддалені логи',
-              children: [
-                _TextField(
-                  scrollKey: _keyFor('remoteLog.url'),
-                  enabled: !_busy,
-                  label: 'URL сервера для логів і метрик',
-                  value: _draft.remoteLogSettings.url,
-                  error: _validation['remoteLog.url'],
-                  onChanged: (value) =>
-                      _changed(() => _draft.remoteLogSettings.url = value),
-                ),
-                _TextField(
-                  scrollKey: _keyFor('remoteLog.token'),
-                  enabled: !_busy,
-                  label: 'Token для відправки логів і метрик',
-                  value: _draft.remoteLogSettings.token,
-                  error: _validation['remoteLog.token'],
-                  onChanged: (value) =>
-                      _changed(() => _draft.remoteLogSettings.token = value),
-                ),
-              ],
-            ),
-            _Section(
-              scrollKey: _keyFor('soilSensors'),
-              title: 'Датчики вологості грунту',
-              error: _validation['soilSensors'],
-              actionLabel: 'Додати датчик',
-              onAction: _busy
-                  ? null
-                  : () => _changed(() => _draft.soilSensors.add(
-                        SoilSensorSettingDraft(
-                          slaveAddress: '',
-                          name: '',
-                        ),
-                      )),
-              children: [
-                _NumberField(
-                  scrollKey:
-                      _keyFor('global.idleSoilSensorReadIntervalSeconds'),
-                  enabled: !_busy,
-                  label: 'Інтервал зчитування у режимі очікування, с',
-                  value:
-                      _draft.globalSettings.idleSoilSensorReadIntervalSeconds,
-                  error:
-                      _validation['global.idleSoilSensorReadIntervalSeconds'],
-                  onChanged: (value) => _changed(() => _draft.globalSettings
-                      .idleSoilSensorReadIntervalSeconds = value),
-                ),
-                _NumberField(
-                  scrollKey:
-                      _keyFor('global.wateringSoilSensorReadIntervalSeconds'),
-                  enabled: !_busy,
-                  label: 'Інтервал зчитування під час поливу, с',
-                  value: _draft
-                      .globalSettings.wateringSoilSensorReadIntervalSeconds,
-                  error: _validation[
-                      'global.wateringSoilSensorReadIntervalSeconds'],
-                  onChanged: (value) => _changed(() => _draft.globalSettings
-                      .wateringSoilSensorReadIntervalSeconds = value),
-                ),
-                for (var i = 0; i < _draft.soilSensors.length; i += 1)
-                  _SoilSensorEditor(
+              ),
+              _Section(
+                title: 'Віддалені логи',
+                children: [
+                  _TextField(
+                    scrollKey: _keyFor('remoteLog.url'),
                     enabled: !_busy,
-                    index: i,
-                    sensor: _draft.soilSensors[i],
-                    validation: _validation,
-                    onChanged: _changed,
-                    onRemove: () => _confirmRemoveSoilSensor(i),
-                    keyFor: _keyFor,
+                    label: 'URL сервера для логів і метрик',
+                    value: _draft.remoteLogSettings.url,
+                    error: _validation['remoteLog.url'],
+                    onChanged: (value) =>
+                        _changed(() => _draft.remoteLogSettings.url = value),
                   ),
-              ],
-            ),
-            _PressureSensorEditor(
-              enabled: !_busy,
-              draft: _draft,
-              validation: _validation,
-              onChanged: _changed,
-              keyFor: _keyFor,
-            ),
-            _WaterCountersEditor(
-              enabled: !_busy,
-              draft: _draft,
-              validation: _validation,
-              onChanged: _changed,
-              keyFor: _keyFor,
-            ),
-            _ValvesEditor(
-              enabled: !_busy,
-              draft: _draft,
-              validation: _validation,
-              onChanged: _changed,
-              keyFor: _keyFor,
-            ),
-          ],
+                  _TextField(
+                    scrollKey: _keyFor('remoteLog.token'),
+                    enabled: !_busy,
+                    label: 'Token для відправки логів і метрик',
+                    value: _draft.remoteLogSettings.token,
+                    error: _validation['remoteLog.token'],
+                    onChanged: (value) =>
+                        _changed(() => _draft.remoteLogSettings.token = value),
+                  ),
+                ],
+              ),
+              _Section(
+                scrollKey: _keyFor('soilSensors'),
+                title: 'Датчики вологості грунту',
+                error: _validation['soilSensors'],
+                actionLabel: 'Додати датчик',
+                onAction: _busy
+                    ? null
+                    : () => _changed(() => _draft.soilSensors.add(
+                          SoilSensorSettingDraft(
+                            slaveAddress: '',
+                            name: '',
+                          ),
+                        )),
+                children: [
+                  _NumberField(
+                    scrollKey:
+                        _keyFor('global.idleSoilSensorReadIntervalSeconds'),
+                    enabled: !_busy,
+                    label: 'Інтервал зчитування у режимі очікування, с',
+                    value:
+                        _draft.globalSettings.idleSoilSensorReadIntervalSeconds,
+                    error:
+                        _validation['global.idleSoilSensorReadIntervalSeconds'],
+                    onChanged: (value) => _changed(() => _draft.globalSettings
+                        .idleSoilSensorReadIntervalSeconds = value),
+                  ),
+                  _NumberField(
+                    scrollKey:
+                        _keyFor('global.wateringSoilSensorReadIntervalSeconds'),
+                    enabled: !_busy,
+                    label: 'Інтервал зчитування під час поливу, с',
+                    value: _draft
+                        .globalSettings.wateringSoilSensorReadIntervalSeconds,
+                    error: _validation[
+                        'global.wateringSoilSensorReadIntervalSeconds'],
+                    onChanged: (value) => _changed(() => _draft.globalSettings
+                        .wateringSoilSensorReadIntervalSeconds = value),
+                  ),
+                  for (var i = 0; i < _draft.soilSensors.length; i += 1)
+                    _SoilSensorEditor(
+                      enabled: !_busy,
+                      index: i,
+                      sensor: _draft.soilSensors[i],
+                      validation: _validation,
+                      onChanged: _changed,
+                      onRemove: () => _confirmRemoveSoilSensor(i),
+                      keyFor: _keyFor,
+                    ),
+                ],
+              ),
+              _PressureSensorEditor(
+                enabled: !_busy,
+                draft: _draft,
+                validation: _validation,
+                onChanged: _changed,
+                keyFor: _keyFor,
+              ),
+              _WaterCountersEditor(
+                enabled: !_busy,
+                draft: _draft,
+                validation: _validation,
+                onChanged: _changed,
+                keyFor: _keyFor,
+              ),
+              _ValvesEditor(
+                enabled: !_busy,
+                draft: _draft,
+                validation: _validation,
+                onChanged: _changed,
+                keyFor: _keyFor,
+              ),
+            ],
+          ),
         ),
       ),
     );
