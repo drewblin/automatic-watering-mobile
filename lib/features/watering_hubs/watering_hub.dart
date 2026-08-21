@@ -6,6 +6,7 @@ class WateringHub {
     required this.displayName,
     required this.bleDeviceId,
     required this.lastKnownIpAddress,
+    required this.lastKnownHostname,
     required this.apiAccessToken,
     required this.serverDeviceId,
     required this.onboardingCompletedAt,
@@ -17,6 +18,7 @@ class WateringHub {
   final String displayName;
   final String bleDeviceId;
   final String? lastKnownIpAddress;
+  final String lastKnownHostname;
   final String? apiAccessToken;
   final String? serverDeviceId;
   final DateTime? onboardingCompletedAt;
@@ -26,14 +28,14 @@ class WateringHub {
   bool get isOnboardingComplete => onboardingCompletedAt != null;
 
   ReadyWateringHubAccess? get readyAccess {
-    final ipAddress = lastKnownIpAddress;
     final token = apiAccessToken;
-    if (ipAddress == null || token == null) {
+    final ipAddress = lastKnownIpAddress;
+    if (token == null || ipAddress == null) {
       return null;
     }
     return ReadyWateringHubAccess(
       hub: this,
-      ipAddress: ipAddress,
+      host: ipAddress,
       apiAccessToken: token,
     );
   }
@@ -44,6 +46,8 @@ class WateringHub {
       displayName: readString(json['displayName'], 'displayName'),
       bleDeviceId: readString(json['bleDeviceId'], 'bleDeviceId'),
       lastKnownIpAddress: json['lastKnownIpAddress'] as String?,
+      lastKnownHostname:
+          readString(json['lastKnownHostname'], 'lastKnownHostname'),
       apiAccessToken: null,
       serverDeviceId: json['serverDeviceId'] as String?,
       onboardingCompletedAt: json['onboardingCompletedAt'] == null
@@ -61,6 +65,7 @@ class WateringHub {
       'displayName': displayName,
       'bleDeviceId': bleDeviceId,
       'lastKnownIpAddress': lastKnownIpAddress,
+      'lastKnownHostname': lastKnownHostname,
       'serverDeviceId': serverDeviceId,
       'onboardingCompletedAt': onboardingCompletedAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
@@ -73,6 +78,7 @@ class WateringHub {
     String? displayName,
     String? bleDeviceId,
     String? lastKnownIpAddress,
+    String? lastKnownHostname,
     String? apiAccessToken,
     String? serverDeviceId,
     DateTime? onboardingCompletedAt,
@@ -85,6 +91,7 @@ class WateringHub {
       displayName: displayName ?? this.displayName,
       bleDeviceId: bleDeviceId ?? this.bleDeviceId,
       lastKnownIpAddress: lastKnownIpAddress ?? this.lastKnownIpAddress,
+      lastKnownHostname: lastKnownHostname ?? this.lastKnownHostname,
       apiAccessToken:
           clearApiAccessToken ? null : apiAccessToken ?? this.apiAccessToken,
       serverDeviceId: serverDeviceId ?? this.serverDeviceId,
@@ -99,13 +106,15 @@ class WateringHub {
 class ReadyWateringHubAccess {
   const ReadyWateringHubAccess({
     required this.hub,
-    required this.ipAddress,
+    required this.host,
     required this.apiAccessToken,
   });
 
   final WateringHub hub;
-  final String ipAddress;
+  final String host;
   final String apiAccessToken;
+
+  String get ipAddress => host;
 
   String get wateringHubId => hub.id;
 }

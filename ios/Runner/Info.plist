@@ -30,6 +30,8 @@
 	<string>Додаток використовує Bluetooth, щоб знайти контролер поливу та виконати сполучення під час налаштування.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Додаток використовує Bluetooth для налаштування контролера поливу.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Додаток підключається до контролера поливу в локальній Wi-Fi мережі.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

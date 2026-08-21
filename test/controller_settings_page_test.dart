@@ -160,6 +160,7 @@ WateringHub _hub() {
     displayName: 'Automatic Watering Hub',
     bleDeviceId: 'AA:BB:CC',
     lastKnownIpAddress: '192.168.1.42',
+    lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,
     onboardingCompletedAt: createdAt,

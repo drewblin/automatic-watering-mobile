@@ -310,6 +310,7 @@ WateringHub _hub({required String bleDeviceId}) {
     displayName: 'Теплиця',
     bleDeviceId: bleDeviceId,
     lastKnownIpAddress: '192.168.1.42',
+    lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,
     onboardingCompletedAt: now,
@@ -423,7 +424,11 @@ class FakeBleService implements BleService {
 
   @override
   Future<ControllerIpAddress> readWifiIpAddress(String deviceId) async {
-    return const ControllerIpAddress('192.168.1.42');
+    return const ControllerIpAddress(
+      '192.168.1.42',
+      hostname: 'watering-hub-a1b2c3',
+      localHostname: 'watering-hub-a1b2c3.local',
+    );
   }
 
   @override

@@ -7,10 +7,15 @@ import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_save_controller.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
+import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/modbus_address/modbus_address_change_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
@@ -22,19 +27,23 @@ class TestAppComposition {
     InMemoryWateringHubTokenStorage? tokenStorage,
     InMemoryDiagnosticsLog? diagnosticsLog,
     BleService? bleService,
-    required LocalControllerApiClient localControllerApiClient,
+    LocalControllerApiClient? localControllerApiClient,
+    MdnsControllerResolver? mdnsControllerResolver,
   })  : wateringHubStorage = wateringHubStorage ?? InMemoryWateringHubStorage(),
         tokenStorage = tokenStorage ?? InMemoryWateringHubTokenStorage(),
         diagnosticsLog = diagnosticsLog ?? InMemoryDiagnosticsLog() {
+    final apiClient =
+        localControllerApiClient ?? _NoopLocalControllerApiClient();
     final stateStore = AppStateStore();
     final controllerSettingsRepository = ControllerSettingsRepository(
-      apiClient: localControllerApiClient,
+      apiClient: apiClient,
     );
     final startup = AppStartupService(
       stateStore: stateStore,
       wateringHubStorage: this.wateringHubStorage,
       tokenStorage: this.tokenStorage,
       controllerSettingsRepository: controllerSettingsRepository,
+      mdnsControllerResolver: mdnsControllerResolver ?? _NoopMdnsResolver(),
       diagnosticsLog: this.diagnosticsLog,
     );
     onboarding = OnboardingAppService(
@@ -56,7 +65,7 @@ class TestAppComposition {
           autoReconnect: false,
         ),
         modbusAddressChangeController: ModbusAddressChangeController(
-          apiClient: localControllerApiClient,
+          apiClient: apiClient,
           activeControllerAccessProvider: () =>
               stateStore.state.activeWateringHub?.readyAccess,
         ),
@@ -71,7 +80,7 @@ class TestAppComposition {
       homeDashboardController: HomeDashboardController(
         stateStore: stateStore,
         settingsRepository: controllerSettingsRepository,
-        apiClient: localControllerApiClient,
+        apiClient: apiClient,
       ),
     );
   }
@@ -81,6 +90,72 @@ class TestAppComposition {
   final InMemoryDiagnosticsLog diagnosticsLog;
   late final AppController appController;
   late final OnboardingAppService onboarding;
+}
+
+class _NoopMdnsResolver implements MdnsControllerResolver {
+  const _NoopMdnsResolver();
+
+  @override
+  Future<String?> resolve({
+    required String hostname,
+    required String localHostname,
+  }) async {
+    return null;
+  }
+}
+
+class _NoopLocalControllerApiClient implements LocalControllerApiClient {
+  const _NoopLocalControllerApiClient();
+
+  @override
+  Future<void> checkSettingsAccess({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {}
+
+  @override
+  Future<SettingsResponseData> getSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) {
+    throw const LocalControllerApiException();
+  }
+
+  @override
+  Future<void> putSettings({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ControllerSettings settings,
+  }) async {}
+
+  @override
+  Future<List<ControllerSensorMetric>> getSensorMetrics({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<void> openValveForTime({
+    required String ipAddress,
+    required String apiAccessToken,
+    required int pin,
+    required int seconds,
+  }) async {}
+
+  @override
+  Future<ModbusAddressChangeResult> changeModbusAddress({
+    required String ipAddress,
+    required String apiAccessToken,
+    required ModbusAddressChangeRequest request,
+  }) async {
+    return ModbusAddressChangeResult(
+      currentAddress: request.currentAddress,
+      newAddress: request.newAddress,
+      registerAddress: request.registerAddress,
+    );
+  }
 }
 
 class _NoopBleService implements BleService {
@@ -136,7 +211,11 @@ class _NoopBleService implements BleService {
 
   @override
   Future<ControllerIpAddress> readWifiIpAddress(String deviceId) async {
-    return const ControllerIpAddress('192.168.1.42');
+    return const ControllerIpAddress(
+      '192.168.1.42',
+      hostname: 'watering-hub-a1b2c3',
+      localHostname: 'watering-hub-a1b2c3.local',
+    );
   }
 
   @override

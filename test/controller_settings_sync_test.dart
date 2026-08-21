@@ -28,6 +28,7 @@ void main() {
         displayName: 'Automatic Watering Hub',
         bleDeviceId: 'AA:BB:CC',
         lastKnownIpAddress: '192.168.1.42',
+        lastKnownHostname: 'watering-hub-a1b2c3.local',
         apiAccessToken: null,
         serverDeviceId: null,
         onboardingCompletedAt: createdAt,

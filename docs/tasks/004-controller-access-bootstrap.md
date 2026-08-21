@@ -61,7 +61,9 @@ HTTPS API контролера має базовий URL `https://<controller-ip
 {
   "success": true,
   "data": {
-    "ipAddress": "192.168.1.42"
+    "ipAddress": "192.168.1.42",
+    "hostname": "watering-hub-a1b2c3",
+    "localHostname": "watering-hub-a1b2c3.local"
   },
   "error": null
 }
@@ -82,13 +84,14 @@ HTTPS API контролера має базовий URL `https://<controller-ip
 }
 ```
 
-Parsing цих значень має бути ізольований від UI. `ipAddress` має тип string; `0.0.0.0` означає, що Wi-Fi ще не підключений. `apiAccessToken` має бути string і зберігатися як секрет; якщо token порожній або має неправильний формат, state має перейти в помилку або `tokenInvalid`.
+Parsing цих значень має бути ізольований від UI. `ipAddress`, `hostname` і `localHostname` мають бути непорожніми string; додаток має використовувати `localHostname` для mDNS discovery, отримувати з resolver реальну IP-адресу і виконувати локальні HTTPS запити по IP. `ipAddress` з BLE лишається fallback/diagnostics значенням; `0.0.0.0` означає, що Wi-Fi ще не підключений. `apiAccessToken` має бути string і зберігатися як секрет; якщо token порожній або має неправильний формат, state має перейти в помилку або `tokenInvalid`.
 
 ### 3. Save controller access data
 
 Після успішного читання IP/token потрібно:
 
 - оновити активний `WateringHub.lastKnownIpAddress`;
+- оновити активний `WateringHub.lastKnownHostname`, якщо controller повернув `localHostname`;
 - зберегти token через `TokenStorage`;
 - оновити `updatedAt`;
 - не дублювати token у plain local storage;
@@ -102,7 +105,13 @@ Parsing цих значень має бути ізольований від UI. 
 
 Мінімально потрібні:
 
-- base URL з `https://<lastKnownIpAddress>`;
+- під час onboarding один раз спробувати mDNS discovery для `lastKnownHostname`;
+- якщо mDNS discovery повернув IP, зберегти resolved IP у `lastKnownIpAddress` без додаткового HTTPS check;
+- якщо mDNS discovery не повернув IP, зберегти fallback `lastKnownIpAddress` з BLE без додаткового HTTPS check;
+- при старті додатку з completed hub повторити mDNS discovery для `lastKnownHostname`;
+- якщо startup mDNS discovery повернув IP, оновити `lastKnownIpAddress` і виконувати локальні HTTPS запити по цьому IP;
+- якщо startup mDNS discovery не повернув IP, виконувати локальні HTTPS запити через збережений `lastKnownIpAddress`;
+- mDNS resolver має писати в diagnostics, вдалось чи не вдалось зарезолвити host; fallback на BLE/saved IP логують caller-и без дублювання mDNS повідомлень;
 - bearer token auth header;
 - timeout;
 - базовий error mapping:

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/json_helpers.dart';
 import 'ble_constants.dart';
 
 enum BleAvailability {
@@ -65,21 +66,29 @@ class BleDeviceServices {
 
 @immutable
 class ControllerIpAddress {
-  const ControllerIpAddress(this.value);
+  const ControllerIpAddress(
+    this.ipAddress, {
+    required this.hostname,
+    required this.localHostname,
+  });
 
-  final String value;
+  final String ipAddress;
+  final String hostname;
+  final String localHostname;
 
-  bool get isPending => value == '0.0.0.0';
+  String get value => preferredHost;
+
+  String get preferredHost => localHostname;
+
+  bool get isPending => ipAddress == '0.0.0.0';
 
   factory ControllerIpAddress.fromJson(Object? data) {
-    if (data is! Map<String, Object?>) {
-      throw FormatException('Expected WifiIpAddress data object');
-    }
-    final ipAddress = data['ipAddress'];
-    if (ipAddress is! String || ipAddress.trim().isEmpty) {
-      throw FormatException('Expected non-empty ipAddress');
-    }
-    return ControllerIpAddress(ipAddress.trim());
+    final json = readObject(data, 'WifiIpAddress data');
+    return ControllerIpAddress(
+      readString(json['ipAddress'], 'ipAddress'),
+      hostname: readString(json['hostname'], 'hostname'),
+      localHostname: readString(json['localHostname'], 'localHostname'),
+    );
   }
 }
 

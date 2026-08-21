@@ -4,7 +4,7 @@ import '../../app/onboarding_app_service.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import '../../features/diagnostics/diagnostics_log.dart';
-import '../../features/local_controller/local_controller_api_client.dart';
+import '../../features/local_controller/mdns_controller_resolver.dart';
 import '../../features/watering_hubs/watering_hub.dart';
 import 'ble_controller_access_flow.dart';
 import 'ble_discovery_flow.dart';
@@ -22,7 +22,7 @@ class BleOnboardingController extends ChangeNotifier {
     required BleService bleService,
     required PhoneWifiService phoneWifiService,
     required OnboardingAppService onboardingStorage,
-    required LocalControllerApiClient localControllerApiClient,
+    required MdnsControllerResolver mdnsControllerResolver,
     required DiagnosticsLog diagnosticsLog,
     Duration rebootDelay = const Duration(seconds: 4),
     Duration reconnectRetryDelay = const Duration(seconds: 2),
@@ -62,7 +62,7 @@ class BleOnboardingController extends ChangeNotifier {
       stateStore: _stateStore,
       bleService: _bleService,
       onboardingStorage: onboardingStorage,
-      localControllerApiClient: localControllerApiClient,
+      mdnsControllerResolver: mdnsControllerResolver,
       diagnosticsLog: diagnosticsLog,
       retryDelay: controllerAccessRetryDelay,
       maxAttempts: maxControllerAccessAttempts,

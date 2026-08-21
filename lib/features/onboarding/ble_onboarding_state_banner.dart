@@ -152,8 +152,8 @@ class BleOnboardingStateBanner extends StatelessWidget {
       ReadingControllerAccess(:final ipAddress) => (
           'Читання доступу',
           ipAddress == null
-              ? 'Читаємо IP-адресу контролера через BLE.'
-              : 'IP-адресу отримано: $ipAddress. Читаємо дані доступу.',
+              ? 'Читаємо мережеву адресу контролера через BLE.'
+              : 'Адресу отримано: $ipAddress. Читаємо дані доступу.',
           Icons.vpn_key,
         ),
       CheckingLocalHttpsAccess(:final ipAddress) => (

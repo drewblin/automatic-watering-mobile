@@ -11,6 +11,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
+import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';
@@ -35,7 +36,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
     final device = const BleDiscoveredDevice(
@@ -68,7 +69,7 @@ void main() {
       ),
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
@@ -100,6 +101,7 @@ void main() {
         displayName: 'Existing hub',
         bleDeviceId: 'OLD:DEVICE',
         lastKnownIpAddress: '192.168.1.50',
+        lastKnownHostname: 'old-controller.local',
         apiAccessToken: 'token',
         serverDeviceId: 'server-device',
         onboardingCompletedAt: createdAt,
@@ -117,7 +119,7 @@ void main() {
       bleService: FakeBleService(),
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -152,7 +154,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -166,7 +167,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
@@ -183,7 +184,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -199,7 +199,7 @@ void main() {
         ),
       ),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
@@ -220,7 +220,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -230,7 +229,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: diagnosticsLog,
       readCurrentWifiSettingsTimeout: const Duration(milliseconds: 1),
     );
@@ -256,7 +255,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -265,7 +263,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
@@ -286,7 +284,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -295,7 +292,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -319,7 +316,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -333,7 +329,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
@@ -352,7 +348,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -364,7 +359,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -393,7 +388,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -402,7 +396,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -442,7 +436,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: localClient,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -461,8 +455,8 @@ void main() {
     expect(storage.activeHub?.apiAccessToken, isNull);
     expect(storage.activeHub?.onboardingCompletedAt, isNotNull);
     expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
-    expect(localClient.checkedIpAddress, '192.168.1.42');
-    expect(localClient.checkedToken, validToken);
+    expect(localClient.checkedIpAddress, isNull);
+    expect(localClient.checkedToken, isNull);
     expect(appController.state.startupStatus, AppStartupStatus.onboarding);
     expect(appController.state.activeWateringHub?.apiAccessToken, validToken);
     expect(
@@ -476,25 +470,170 @@ void main() {
     expect(appController.state.settings?.syncedAt, isNotNull);
   });
 
+  test('bootstrap uses BLE IP when mDNS resolver is unavailable', () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final localClient = FakeLocalControllerApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+    );
+    await composition.appController.initialize();
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final bleService = FakeBleService(
+      wifiIpAddress: const ControllerIpAddress(
+        '192.168.1.42',
+        hostname: 'espirrigation',
+        localHostname: 'espirrigation.local',
+      ),
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
+      diagnosticsLog: diagnosticsLog,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
+    expect(storage.activeHub?.lastKnownHostname, 'espirrigation.local');
+    expect(
+      composition.appController.state.activeWateringHub?.readyAccess?.ipAddress,
+      '192.168.1.42',
+    );
+    expect(localClient.checkedIpAddress, isNull);
+    expect(
+      diagnosticsLog.entries.map((entry) => entry.message),
+      contains('Використовуємо IP-адресу з BLE.'),
+    );
+  });
+
+  test('bootstrap uses explicit mDNS resolved address before hostname',
+      () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final localClient = FakeLocalControllerApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+    );
+    await composition.appController.initialize();
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final bleService = FakeBleService(
+      wifiIpAddress: const ControllerIpAddress(
+        '192.168.1.42',
+        hostname: 'espirrigation',
+        localHostname: 'espirrigation.local',
+      ),
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(
+        resolvedIpAddress: '192.168.1.77',
+      ),
+      diagnosticsLog: diagnosticsLog,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(storage.activeHub?.lastKnownHostname, 'espirrigation.local');
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.77');
+    expect(localClient.checkedIpAddresses, isEmpty);
+    expect(diagnosticsLog.entries, isEmpty);
+  });
+
+  test('bootstrap keeps mDNS resolved IP without HTTPS verification', () async {
+    final storage = InMemoryWateringHubStorage();
+    final tokenStorage = InMemoryWateringHubTokenStorage();
+    final localClient = FakeLocalControllerApiClient();
+    final composition = TestAppComposition(
+      wateringHubStorage: storage,
+      tokenStorage: tokenStorage,
+    );
+    await composition.appController.initialize();
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final bleService = FakeBleService(
+      wifiIpAddress: const ControllerIpAddress(
+        '192.168.1.42',
+        hostname: 'espirrigation',
+        localHostname: 'espirrigation.local',
+      ),
+    );
+    final controller = BleOnboardingController(
+      bleService: bleService,
+      phoneWifiService: FakePhoneWifiService(),
+      onboardingStorage: composition.onboarding,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(
+        resolvedIpAddress: '192.168.1.77',
+      ),
+      diagnosticsLog: diagnosticsLog,
+      rebootDelay: Duration.zero,
+      reconnectRetryDelay: Duration.zero,
+      maxControllerAccessAttempts: 1,
+    );
+
+    controller.selectDevice(testDevice);
+    await controller.connectSelectedDevice();
+    await controller.saveWifiSettings(
+      const WifiCredentials(ssid: 'Garden', password: 'secure123'),
+    );
+    await controller.bootstrapControllerAccess();
+
+    expect(controller.state, isA<ControllerAccessReady>());
+    expect(storage.activeHub?.lastKnownHostname, 'espirrigation.local');
+    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.77');
+    expect(localClient.checkedIpAddresses, isEmpty);
+    expect(
+      composition.appController.state.activeWateringHub?.readyAccess?.ipAddress,
+      '192.168.1.77',
+    );
+    expect(diagnosticsLog.entries, isEmpty);
+  });
+
   test('bootstrap treats 0.0.0.0 as pending and does not call HTTPS', () async {
     final storage = InMemoryWateringHubStorage();
     final tokenStorage = InMemoryWateringHubTokenStorage();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService(
-      wifiIpAddress: const ControllerIpAddress('0.0.0.0'),
+      wifiIpAddress: const ControllerIpAddress(
+        '0.0.0.0',
+        hostname: 'watering-hub-a1b2c3',
+        localHostname: 'watering-hub-a1b2c3.local',
+      ),
     );
     final localClient = FakeLocalControllerApiClient();
     final controller = BleOnboardingController(
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: localClient,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -521,14 +660,21 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
     final bleService = FakeBleService(
       wifiIpAddresses: const [
-        ControllerIpAddress('0.0.0.0'),
-        ControllerIpAddress('192.168.1.42'),
+        ControllerIpAddress(
+          '0.0.0.0',
+          hostname: 'watering-hub-a1b2c3',
+          localHostname: 'watering-hub-a1b2c3.local',
+        ),
+        ControllerIpAddress(
+          '192.168.1.42',
+          hostname: 'watering-hub-a1b2c3',
+          localHostname: 'watering-hub-a1b2c3.local',
+        ),
       ],
     );
     final localClient = FakeLocalControllerApiClient();
@@ -536,7 +682,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: localClient,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -552,7 +698,7 @@ void main() {
 
     expect(controller.state, isA<ControllerAccessReady>());
     expect(bleService.readWifiIpAddressCalls, 2);
-    expect(localClient.checkCalls, 1);
+    expect(localClient.checkCalls, 0);
   });
 
   test('bootstrap retries temporary HTTPS network errors automatically',
@@ -562,7 +708,6 @@ void main() {
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -576,7 +721,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: localClient,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -591,15 +736,13 @@ void main() {
     await controller.bootstrapControllerAccess();
 
     expect(controller.state, isA<ControllerAccessReady>());
-    expect(localClient.checkCalls, 2);
+    expect(localClient.checkCalls, 0);
   });
 
-  test('bootstrap maps local controller API failures to communication error',
-      () async {
+  test('bootstrap does not call local controller API provider', () async {
     final composition = TestAppComposition(
       wateringHubStorage: InMemoryWateringHubStorage(),
       tokenStorage: InMemoryWateringHubTokenStorage(),
-      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     final appController = composition.appController;
     await appController.initialize();
@@ -607,9 +750,7 @@ void main() {
       bleService: FakeBleService(),
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(
-        exception: const LocalControllerApiException(),
-      ),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       rebootDelay: Duration.zero,
       reconnectRetryDelay: Duration.zero,
@@ -622,11 +763,7 @@ void main() {
     );
     await controller.bootstrapControllerAccess();
 
-    expect(controller.state, isA<ControllerAccessFailed>());
-    expect(
-      controller.state.controllerAccessErrorMessage,
-      'Помилка комунікації з контролером.',
-    );
+    expect(controller.state, isA<ControllerAccessReady>());
   });
 
   test('recovery reconnects saved controller over BLE and refreshes IP',
@@ -638,6 +775,7 @@ void main() {
         displayName: 'Saved Hub',
         bleDeviceId: 'AA:BB:CC',
         lastKnownIpAddress: '192.168.1.10',
+        lastKnownHostname: 'old-controller.local',
         apiAccessToken: null,
         serverDeviceId: 'server-device',
         onboardingCompletedAt: createdAt,
@@ -646,22 +784,25 @@ void main() {
       );
     final tokenStorage = InMemoryWateringHubTokenStorage()
       ..tokens['hub-aa-bb-cc'] = validToken;
-    final localClient = FakeLocalControllerApiClient();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      localControllerApiClient: localClient,
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     await composition.appController.initialize();
     final bleService = FakeBleService(
-      wifiIpAddress: const ControllerIpAddress('192.168.1.42'),
+      wifiIpAddress: const ControllerIpAddress(
+        '192.168.1.42',
+        hostname: 'watering-hub-a1b2c3',
+        localHostname: 'watering-hub-a1b2c3.local',
+      ),
       apiAccessToken: const ControllerApiAccessToken(otherValidToken),
     );
     final controller = BleOnboardingController(
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: localClient,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       controllerAccessRetryDelay: Duration.zero,
       maxControllerAccessAttempts: 1,
@@ -675,11 +816,10 @@ void main() {
     expect(bleService.reconnectCalls, 1);
     expect(storage.activeHub?.id, 'hub-aa-bb-cc');
     expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
+    expect(storage.activeHub?.lastKnownHostname, 'watering-hub-a1b2c3.local');
     expect(storage.activeHub?.serverDeviceId, 'server-device');
     expect(storage.activeHub?.apiAccessToken, isNull);
     expect(tokenStorage.tokens['hub-aa-bb-cc'], otherValidToken);
-    expect(localClient.checkedIpAddress, '192.168.1.42');
-    expect(localClient.checkedToken, otherValidToken);
   });
 
   test('recovery waits for explicit scan when saved controller BLE unavailable',
@@ -690,15 +830,14 @@ void main() {
       displayName: 'Saved Hub',
       bleDeviceId: 'AA:BB:CC',
       lastKnownIpAddress: '192.168.1.10',
+      lastKnownHostname: 'saved-controller.local',
       apiAccessToken: validToken,
       serverDeviceId: null,
       onboardingCompletedAt: createdAt,
       createdAt: createdAt,
       updatedAt: createdAt,
     );
-    final composition = TestAppComposition(
-      localControllerApiClient: FakeLocalControllerApiClient(),
-    );
+    final composition = TestAppComposition();
     final bleService = FakeBleService(
       currentWifi: const WifiCredentials(ssid: 'Garden', password: ''),
       failReconnect: true,
@@ -707,7 +846,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: FakeLocalControllerApiClient(),
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       reconnectRetryDelay: Duration.zero,
     );
@@ -733,6 +872,7 @@ void main() {
         displayName: 'Saved Hub',
         bleDeviceId: 'AA:BB:CC',
         lastKnownIpAddress: '192.168.1.10',
+        lastKnownHostname: 'saved-controller.local',
         apiAccessToken: null,
         serverDeviceId: 'server-device',
         onboardingCompletedAt: createdAt,
@@ -741,11 +881,10 @@ void main() {
       );
     final tokenStorage = InMemoryWateringHubTokenStorage()
       ..tokens['hub-aa-bb-cc'] = validToken;
-    final localClient = FakeLocalControllerApiClient();
     final composition = TestAppComposition(
       wateringHubStorage: storage,
       tokenStorage: tokenStorage,
-      localControllerApiClient: localClient,
+      localControllerApiClient: FakeLocalControllerApiClient(),
     );
     await composition.appController.initialize();
     final bleService = FakeBleService(
@@ -756,7 +895,7 @@ void main() {
       bleService: bleService,
       phoneWifiService: FakePhoneWifiService(),
       onboardingStorage: composition.onboarding,
-      localControllerApiClient: localClient,
+      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: InMemoryDiagnosticsLog(),
       reconnectRetryDelay: Duration.zero,
       controllerAccessRetryDelay: Duration.zero,
@@ -790,12 +929,58 @@ void main() {
 
   test('controller IP and token parsing trusts controller values', () {
     expect(
-      ControllerIpAddress.fromJson({'ipAddress': 'controller.local'}).value,
+      ControllerIpAddress.fromJson({
+        'ipAddress': '192.168.1.42',
+        'hostname': 'controller',
+        'localHostname': 'controller.local',
+      }).value,
       'controller.local',
     );
     expect(
-      ControllerIpAddress.fromJson({'ipAddress': '192.168.001.42'}).value,
+      ControllerIpAddress.fromJson({
+        'ipAddress': '192.168.1.42',
+        'hostname': 'espirrigation',
+        'localHostname': 'espirrigation.local',
+      }).value,
+      'espirrigation.local',
+    );
+    expect(
+      ControllerIpAddress.fromJson({
+        'ipAddress': '0.0.0.0',
+        'hostname': 'watering-hub-a1b2c3',
+        'localHostname': 'watering-hub-a1b2c3.local',
+      }).isPending,
+      isTrue,
+    );
+    expect(
+      () => ControllerIpAddress.fromJson({
+        'ipAddress': '192.168.1.42',
+        'hostname': 'watering-hub-a1b2c3',
+      }),
+      throwsFormatException,
+    );
+    expect(
+      () => ControllerIpAddress.fromJson({
+        'ipAddress': '192.168.1.42',
+        'localHostname': 'watering-hub-a1b2c3.local',
+      }),
+      throwsFormatException,
+    );
+    expect(
+      ControllerIpAddress.fromJson({
+        'ipAddress': '192.168.001.42',
+        'hostname': 'watering-hub-a1b2c3',
+        'localHostname': 'watering-hub-a1b2c3.local',
+      }).ipAddress,
       '192.168.001.42',
+    );
+    expect(
+      ControllerIpAddress.fromJson({
+        'ipAddress': '192.168.1.42',
+        'hostname': ' watering-hub-a1b2c3 ',
+        'localHostname': ' watering-hub-a1b2c3.local ',
+      }).value,
+      ' watering-hub-a1b2c3.local ',
     );
     expect(
       ControllerApiAccessToken.fromJson({'apiAccessToken': 'controller-token'})
@@ -803,8 +988,8 @@ void main() {
       'controller-token',
     );
     expect(
-      ControllerIpAddress.fromJson({'ipAddress': '0.0.0.0'}).isPending,
-      isTrue,
+      () => ControllerIpAddress.fromJson({'ipAddress': '0.0.0.0'}),
+      throwsFormatException,
     );
   });
 
@@ -846,7 +1031,11 @@ const testDevice = BleDiscoveredDevice(
 class FakeBleService implements BleService {
   FakeBleService({
     this.currentWifi = const WifiCredentials(ssid: '', password: ''),
-    this.wifiIpAddress = const ControllerIpAddress('192.168.1.42'),
+    this.wifiIpAddress = const ControllerIpAddress(
+      '192.168.1.42',
+      hostname: 'watering-hub-a1b2c3',
+      localHostname: 'watering-hub-a1b2c3.local',
+    ),
     List<ControllerIpAddress>? wifiIpAddresses,
     this.apiAccessToken = const ControllerApiAccessToken(validToken),
     this.hasAutomaticWateringService = true,
@@ -987,6 +1176,20 @@ class FakePhoneWifiService implements PhoneWifiService {
   Future<PhoneWifiSnapshot> readWifiSnapshot() async => snapshot;
 }
 
+class FakeMdnsControllerResolver implements MdnsControllerResolver {
+  const FakeMdnsControllerResolver({this.resolvedIpAddress});
+
+  final String? resolvedIpAddress;
+
+  @override
+  Future<String?> resolve({
+    required String hostname,
+    required String localHostname,
+  }) async {
+    return resolvedIpAddress;
+  }
+}
+
 class FakeLocalControllerApiClient implements LocalControllerApiClient {
   FakeLocalControllerApiClient({
     this.exception,
@@ -997,6 +1200,7 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
   final List<LocalControllerApiException> exceptions;
   int checkCalls = 0;
   String? checkedIpAddress;
+  final checkedIpAddresses = <String>[];
   String? checkedToken;
 
   @override
@@ -1006,6 +1210,7 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
   }) async {
     checkCalls += 1;
     checkedIpAddress = ipAddress;
+    checkedIpAddresses.add(ipAddress);
     checkedToken = apiAccessToken;
     if (exceptions.isNotEmpty) {
       throw exceptions.removeAt(0);

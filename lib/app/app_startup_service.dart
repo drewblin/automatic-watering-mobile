@@ -3,6 +3,7 @@ import '../features/controller_settings/device_objects.dart';
 import '../features/controller_settings/settings_response_data.dart';
 import '../features/diagnostics/diagnostics_log.dart';
 import '../features/local_controller/local_controller_api_client.dart';
+import '../features/local_controller/mdns_controller_resolver.dart';
 import '../features/plan/plan_schema.dart';
 import '../features/watering_hubs/watering_hub.dart';
 import '../storage/watering_hub_storage.dart';
@@ -16,17 +17,20 @@ class AppStartupService {
     required WateringHubStorage wateringHubStorage,
     required WateringHubTokenStorage tokenStorage,
     required ControllerSettingsRepository controllerSettingsRepository,
+    required MdnsControllerResolver mdnsControllerResolver,
     required DiagnosticsLog diagnosticsLog,
   })  : _stateStore = stateStore,
         _wateringHubStorage = wateringHubStorage,
         _tokenStorage = tokenStorage,
         _controllerSettingsRepository = controllerSettingsRepository,
+        _mdnsControllerResolver = mdnsControllerResolver,
         _diagnosticsLog = diagnosticsLog;
 
   final AppStateStore _stateStore;
   final WateringHubStorage _wateringHubStorage;
   final WateringHubTokenStorage _tokenStorage;
   final ControllerSettingsRepository _controllerSettingsRepository;
+  final MdnsControllerResolver _mdnsControllerResolver;
   final DiagnosticsLog _diagnosticsLog;
 
   Future<void> initialize() async {
@@ -67,10 +71,39 @@ class AppStartupService {
       await _resetCorruptedPersistence(error);
       return;
     }
+    final resolvedHub = await _resolveStartupAccess(hub);
+    if (!identical(resolvedHub, hub)) {
+      _stateStore.setState(AppState.loading(activeWateringHub: resolvedHub));
+    }
     await _loadReadyHub(
-      hub: hub,
+      hub: resolvedHub,
       activePlanSchema: planSchema,
     );
+  }
+
+  Future<WateringHub> _resolveStartupAccess(WateringHub hub) async {
+    final resolvedIpAddress = await _mdnsControllerResolver.resolve(
+      hostname: hub.lastKnownHostname,
+      localHostname: hub.lastKnownHostname,
+    );
+    if (resolvedIpAddress == null) {
+      recordDiagnosticsIssue(
+        diagnosticsLog: _diagnosticsLog,
+        message: 'Використовуємо збережену IP-адресу контролера.',
+        details:
+            'ipAddress=${hub.lastKnownIpAddress}; host=${hub.lastKnownHostname}',
+      );
+      return hub;
+    }
+    if (resolvedIpAddress == hub.lastKnownIpAddress) {
+      return hub;
+    }
+    final updatedHub = hub.copyWith(
+      lastKnownIpAddress: resolvedIpAddress,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _wateringHubStorage.saveActiveWateringHub(updatedHub);
+    return updatedHub;
   }
 
   Future<void> _loadReadyHub({

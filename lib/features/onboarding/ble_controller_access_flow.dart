@@ -3,7 +3,7 @@ import '../../app/onboarding_app_service.dart';
 import '../../features/ble/ble_models.dart';
 import '../../features/ble/ble_service.dart';
 import '../../features/diagnostics/diagnostics_log.dart';
-import '../../features/local_controller/local_controller_api_client.dart';
+import '../../features/local_controller/mdns_controller_resolver.dart';
 import '../../features/watering_hubs/watering_hub.dart';
 import 'ble_onboarding_session.dart';
 import 'ble_onboarding_state.dart';
@@ -16,7 +16,7 @@ class BleControllerAccessFlow {
     required BleOnboardingStateStore stateStore,
     required BleService bleService,
     required OnboardingAppService onboardingStorage,
-    required LocalControllerApiClient localControllerApiClient,
+    required MdnsControllerResolver mdnsControllerResolver,
     required DiagnosticsLog diagnosticsLog,
     Duration retryDelay = const Duration(seconds: 2),
     int maxAttempts = 5,
@@ -24,7 +24,7 @@ class BleControllerAccessFlow {
         _stateStore = stateStore,
         _bleService = bleService,
         _onboardingStorage = onboardingStorage,
-        _localControllerApiClient = localControllerApiClient,
+        _mdnsControllerResolver = mdnsControllerResolver,
         _diagnosticsLog = diagnosticsLog,
         _retryDelay = retryDelay,
         _maxAttempts = maxAttempts;
@@ -33,7 +33,7 @@ class BleControllerAccessFlow {
   final BleOnboardingStateStore _stateStore;
   final BleService _bleService;
   final OnboardingAppService _onboardingStorage;
-  final LocalControllerApiClient _localControllerApiClient;
+  final MdnsControllerResolver _mdnsControllerResolver;
   final DiagnosticsLog _diagnosticsLog;
   final Duration _retryDelay;
   final int _maxAttempts;
@@ -82,6 +82,7 @@ class BleControllerAccessFlow {
   }) async {
     Object? lastUnexpectedError;
     String? lastIpPendingMessage;
+    String? fixedAccessIpAddress;
 
     for (var attempt = 1; attempt <= _maxAttempts; ++attempt) {
       _stateStore.setState(
@@ -98,16 +99,16 @@ class BleControllerAccessFlow {
           _session.isBleConnected = true;
         }
 
-        final ipAddress = await _bleService.readWifiIpAddress(device.id);
+        final wifiAddress = await _bleService.readWifiIpAddress(device.id);
         _stateStore.setState(
           ReadingControllerAccess(
             device: device,
             credentials: credentials,
-            ipAddress: ipAddress.value,
+            ipAddress: wifiAddress.value,
           ),
         );
 
-        if (ipAddress.isPending) {
+        if (wifiAddress.isPending) {
           lastIpPendingMessage =
               'Контролер ще не отримав IP-адресу Wi-Fi. Зачекайте або поверніться до Wi-Fi налаштувань.';
           recordDiagnosticsIssue(
@@ -132,8 +133,13 @@ class BleControllerAccessFlow {
         final token = await _bleService.readApiAccessToken(device.id);
 
         await _savePairedHub(device);
+        fixedAccessIpAddress = await _resolveLocalAccessIpAddress(
+          wifiAddress: wifiAddress,
+          fixedAccessIpAddress: fixedAccessIpAddress,
+        );
         final hub = _session.activeWateringHub!.copyWith(
-          lastKnownIpAddress: ipAddress.value,
+          lastKnownIpAddress: fixedAccessIpAddress,
+          lastKnownHostname: wifiAddress.localHostname,
           updatedAt: DateTime.now().toUtc(),
         );
         _session.activeWateringHub =
@@ -146,13 +152,8 @@ class BleControllerAccessFlow {
           CheckingLocalHttpsAccess(
             device: device,
             credentials: credentials,
-            ipAddress: ipAddress.value,
+            ipAddress: fixedAccessIpAddress,
           ),
-        );
-
-        await _localControllerApiClient.checkSettingsAccess(
-          ipAddress: ipAddress.value,
-          apiAccessToken: token.value,
         );
 
         await _onboardingStorage.completeOnboarding(
@@ -162,19 +163,12 @@ class BleControllerAccessFlow {
           ControllerAccessReady(
             device: device,
             credentials: credentials,
-            ipAddress: ipAddress.value,
+            ipAddress: fixedAccessIpAddress,
           ),
         );
         return;
       } on FatalAppException {
         rethrow;
-      } on LocalControllerApiException catch (error) {
-        if (attempt < _maxAttempts) {
-          await Future<void>.delayed(_retryDelay);
-          continue;
-        }
-        _handleLocalControllerError(device, credentials, error);
-        return;
       } catch (error) {
         lastUnexpectedError = error;
         _session.isBleConnected = false;
@@ -213,19 +207,26 @@ class BleControllerAccessFlow {
     );
   }
 
-  void _handleLocalControllerError(
-    BleDiscoveredDevice device,
-    WifiCredentials credentials,
-    LocalControllerApiException error,
-  ) {
-    _stateStore.setState(
-      ControllerAccessFailed(
-        device: device,
-        credentials: credentials,
-        ipAddress: _stateStore.state.controllerIpAddress,
-        message: 'Помилка комунікації з контролером.',
-      ),
+  Future<String> _resolveLocalAccessIpAddress({
+    required ControllerIpAddress wifiAddress,
+    required String? fixedAccessIpAddress,
+  }) async {
+    if (fixedAccessIpAddress != null) {
+      return fixedAccessIpAddress;
+    }
+    final resolvedIpAddress = await _mdnsControllerResolver.resolve(
+      hostname: wifiAddress.hostname,
+      localHostname: wifiAddress.localHostname,
     );
+    if (resolvedIpAddress != null) {
+      return resolvedIpAddress;
+    }
+    recordDiagnosticsIssue(
+      diagnosticsLog: _diagnosticsLog,
+      message: 'Використовуємо IP-адресу з BLE.',
+      details: 'ipAddress=${wifiAddress.ipAddress}',
+    );
+    return wifiAddress.ipAddress;
   }
 
   Future<void> _savePairedHub(BleDiscoveredDevice device) async {
@@ -250,6 +251,7 @@ class BleControllerAccessFlow {
       displayName: device.displayName,
       bleDeviceId: device.id,
       lastKnownIpAddress: null,
+      lastKnownHostname: '',
       apiAccessToken: null,
       serverDeviceId: null,
       onboardingCompletedAt: null,
