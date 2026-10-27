@@ -21,9 +21,9 @@ List<ServiceConsoleTab> buildServiceConsoleTabs(
       ),
     ),
     ServiceConsoleTab(
-      label: 'Modbus адреса',
-      builder: (_) => ModbusAddressTab(
-        controller: dependencies.modbusAddressChangeController,
+      label: 'Modbus регістр',
+      builder: (_) => ModbusRegisterWriteTab(
+        controller: dependencies.modbusRegisterWriteController,
       ),
     ),
   ];

@@ -6,10 +6,10 @@ class ServiceConsoleDependencies {
   const ServiceConsoleDependencies({
     required this.diagnosticsLog,
     required this.bleLogsController,
-    required this.modbusAddressChangeController,
+    required this.modbusRegisterWriteController,
   });
 
   final DiagnosticsLog diagnosticsLog;
   final BleControllerLogsController bleLogsController;
-  final ModbusAddressChangeController modbusAddressChangeController;
+  final ModbusRegisterWriteController modbusRegisterWriteController;
 }

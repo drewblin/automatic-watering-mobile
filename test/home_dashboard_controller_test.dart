@@ -377,14 +377,15 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
   }
 
   @override
-  Future<ModbusAddressChangeResult> changeModbusAddress({
+  Future<ModbusRegisterWriteResult> writeModbusRegister({
     required String hostname,
     required String apiAccessToken,
-    required ModbusAddressChangeRequest request,
+    required ModbusRegisterWriteRequest request,
   }) async {
-    return ModbusAddressChangeResult(
-      currentAddress: request.currentAddress,
-      newAddress: request.newAddress,
+    return ModbusRegisterWriteResult(
+      status: 0,
+      slaveAddress: request.slaveAddress,
+      value: request.value,
       registerAddress: request.registerAddress,
     );
   }

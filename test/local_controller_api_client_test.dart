@@ -138,12 +138,12 @@ void main() {
     );
 
     await expectLater(
-      client.changeModbusAddress(
+      client.writeModbusRegister(
         hostname: '192.168.1.42',
         apiAccessToken: 'token',
-        request: const ModbusAddressChangeRequest(
-          currentAddress: 11,
-          newAddress: 12,
+        request: const ModbusRegisterWriteRequest(
+          slaveAddress: 11,
+          value: 12,
           registerAddress: 256,
         ),
       ),
@@ -180,13 +180,18 @@ void main() {
     expect(diagnosticsLog.entries, isEmpty);
   });
 
-  test('change Modbus address posts service request body', () async {
+  test('write Modbus register posts authenticated request body', () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
     final httpClient = _FakeHttpClient(
       responseBody: {
         'success': true,
         'error': null,
-        'data': null,
+        'data': {
+          'status': 0,
+          'slaveAddress': 11,
+          'registerAddress': 256,
+          'value': 12,
+        },
       },
     );
     final client = HttpLocalControllerApiClient(
@@ -197,66 +202,142 @@ void main() {
       timeout: const Duration(seconds: 1),
     );
 
-    final result = await client.changeModbusAddress(
+    final result = await client.writeModbusRegister(
       hostname: '192.168.1.42',
       apiAccessToken: 'token',
-      request: const ModbusAddressChangeRequest(
-        currentAddress: 11,
-        newAddress: 12,
+      request: const ModbusRegisterWriteRequest(
+        slaveAddress: 11,
+        value: 12,
         registerAddress: 256,
       ),
     );
 
-    expect(result.currentAddress, 11);
-    expect(result.newAddress, 12);
+    expect(result.status, 0);
+    expect(result.slaveAddress, 11);
+    expect(result.value, 12);
     expect(result.registerAddress, 256);
-    expect(httpClient.lastUri?.path, '/api/modbus/device-address');
+    expect(httpClient.lastMethod, 'POST');
+    expect(httpClient.lastAuthorization, 'Bearer token');
+    expect(httpClient.lastUri?.path, '/api/modbus/register/save');
+    expect(httpClient.requestBodies, hasLength(1));
     expect(httpClient.lastRequestBody, {
-      'currentAddress': 11,
-      'newAddress': 12,
+      'slaveAddress': 11,
       'registerAddress': 256,
+      'value': 12,
     });
     expect(diagnosticsLog.entries, isEmpty);
   });
 
-  test('change Modbus address includes optional save register fields',
-      () async {
-    final diagnosticsLog = InMemoryDiagnosticsLog();
-    final httpClient = _FakeHttpClient(
-      responseBody: {
-        'success': true,
-        'error': null,
-        'data': null,
-      },
-    );
+  test('Modbus write result comes from the controller response', () async {
     final client = HttpLocalControllerApiClient(
       addressService:
           ControllerAddressService(mdnsControllerResolver: _Resolver()),
-      httpClient: httpClient,
-      diagnosticsLog: diagnosticsLog,
-      timeout: const Duration(seconds: 1),
+      httpClient: _FakeHttpClient(responseBody: {
+        'success': true,
+        'error': null,
+        'data': {
+          'status': 0,
+          'slaveAddress': 17,
+          'registerAddress': 32,
+          'value': 42,
+        },
+      }),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
-    await client.changeModbusAddress(
+    final result = await client.writeModbusRegister(
       hostname: '192.168.1.42',
       apiAccessToken: 'token',
-      request: const ModbusAddressChangeRequest(
-        currentAddress: 11,
-        newAddress: 12,
+      request: const ModbusRegisterWriteRequest(
+        slaveAddress: 11,
         registerAddress: 256,
-        saveRegisterAddress: 512,
-        saveValue: 1,
+        value: 12,
       ),
     );
 
-    expect(httpClient.lastRequestBody, {
-      'currentAddress': 11,
-      'newAddress': 12,
-      'registerAddress': 256,
-      'saveRegisterAddress': 512,
-      'saveValue': 1,
-    });
+    expect(result.status, 0);
+    expect(result.slaveAddress, 17);
+    expect(result.registerAddress, 32);
+    expect(result.value, 42);
   });
+
+  for (final data in [
+    null,
+    {'slaveAddress': 11, 'registerAddress': 256, 'value': 12},
+    {'status': 226, 'slaveAddress': 11, 'registerAddress': 256, 'value': 12},
+  ]) {
+    test('Modbus write rejects invalid or failed result $data', () async {
+      final diagnosticsLog = InMemoryDiagnosticsLog();
+      final client = HttpLocalControllerApiClient(
+        addressService:
+            ControllerAddressService(mdnsControllerResolver: _Resolver()),
+        httpClient: _FakeHttpClient(responseBody: {
+          'success': true,
+          'error': null,
+          'data': data,
+        }),
+        diagnosticsLog: diagnosticsLog,
+      );
+
+      await expectLater(
+        client.writeModbusRegister(
+          hostname: '192.168.1.42',
+          apiAccessToken: 'token',
+          request: const ModbusRegisterWriteRequest(
+            slaveAddress: 11,
+            registerAddress: 256,
+            value: 12,
+          ),
+        ),
+        throwsA(isA<LocalControllerApiException>()),
+      );
+      expect(diagnosticsLog.entries.single.path, '/api/modbus/register/save');
+    });
+  }
+
+  for (final statusCode in [HttpStatus.ok, HttpStatus.internalServerError]) {
+    test('Modbus write failure with HTTP $statusCode stops the operation',
+        () async {
+      final diagnosticsLog = InMemoryDiagnosticsLog();
+      final httpClient = _FakeHttpClient(
+        statusCode: statusCode,
+        responseBody: {
+          'success': false,
+          'data': {
+            'status': 226,
+            'slaveAddress': 11,
+            'registerAddress': 256,
+            'value': 12,
+          },
+          'error': 'Failed to write Modbus register',
+        },
+      );
+      final client = HttpLocalControllerApiClient(
+        addressService:
+            ControllerAddressService(mdnsControllerResolver: _Resolver()),
+        httpClient: httpClient,
+        diagnosticsLog: diagnosticsLog,
+      );
+
+      await expectLater(
+        client.writeModbusRegister(
+          hostname: '192.168.1.42',
+          apiAccessToken: 'token',
+          request: const ModbusRegisterWriteRequest(
+            slaveAddress: 11,
+            value: 12,
+            registerAddress: 256,
+          ),
+        ),
+        throwsA(isA<LocalControllerApiException>()),
+      );
+
+      expect(httpClient.requestBodies, hasLength(1));
+      expect(diagnosticsLog.entries.single.path, '/api/modbus/register/save');
+      expect(diagnosticsLog.entries.single.responseBody,
+          contains('Failed to write Modbus register'));
+    });
+  }
 }
 
 class _FakeHttpClient implements HttpClient {
@@ -266,6 +347,7 @@ class _FakeHttpClient implements HttpClient {
       : _responseBody = responseBody;
 
   final Map<String, Object?> _responseBody;
+  final requestBodies = <Map<String, Object?>?>[];
   Uri? lastUri;
   final int statusCode;
   String? lastMethod;
@@ -325,7 +407,11 @@ class _FakeHttpClientRequest implements HttpClientRequest {
       _client.lastRequestBody =
           jsonDecode(utf8.decode(_body)) as Map<String, Object?>;
     }
-    return _FakeHttpClientResponse(_responseBody, _client.statusCode);
+    _client.requestBodies.add(_client.lastRequestBody);
+    return _FakeHttpClientResponse(
+      _responseBody,
+      _client.statusCode,
+    );
   }
 
   @override

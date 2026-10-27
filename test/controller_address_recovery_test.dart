@@ -76,7 +76,15 @@ void main() {
       resolver.address = newIp;
       transport.respond = (_, uri) async {
         if (uri.host == oldIp) throw TimeoutException('Response lost');
-        return _HttpResponse();
+        return _HttpResponse(
+            data: command == 'modbus'
+                ? const {
+                    'status': 0,
+                    'slaveAddress': 1,
+                    'registerAddress': 256,
+                    'value': 2
+                  }
+                : const {'sensors': []});
       };
       switch (command) {
         case 'openValve':
@@ -86,11 +94,11 @@ void main() {
           await client.closeAllValves(
               hostname: hostname, apiAccessToken: token);
         case 'modbus':
-          await client.changeModbusAddress(
+          await client.writeModbusRegister(
               hostname: hostname,
               apiAccessToken: token,
-              request: const ModbusAddressChangeRequest(
-                  currentAddress: 1, newAddress: 2, registerAddress: 256));
+              request: const ModbusRegisterWriteRequest(
+                  slaveAddress: 1, value: 2, registerAddress: 256));
         case 'settings':
           await client.putSettings(
               hostname: hostname,

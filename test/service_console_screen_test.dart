@@ -30,188 +30,148 @@ void main() {
 
     expect(find.text('Сервісна консоль'), findsOneWidget);
     expect(find.text('Діагностика'), findsOneWidget);
-    expect(tester.widget<Tab>(find.byType(Tab).last).text, 'Modbus адреса');
+    expect(tester.widget<Tab>(find.byType(Tab).last).text, 'Modbus регістр');
     expect(find.text('Діагностичних записів немає.'), findsOneWidget);
   });
 
-  testWidgets('shows Modbus address tab and validates address range',
-      (tester) async {
-    await tester.pumpWidget(
-      _TestApp(
-        diagnosticsLog: InMemoryDiagnosticsLog(),
-        bleService: FakeBleService(),
-        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
+  testWidgets('shows Modbus register write form', (tester) async {
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
 
-    await tester.tap(find.text('Modbus адреса'));
+    await tester.tap(find.text('Modbus регістр'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Поточна адреса девайса'), findsOneWidget);
-    expect(find.text('Нова адреса'), findsOneWidget);
-    expect(find.text('Адреса register'), findsOneWidget);
-    expect(find.text('Save register address'), findsOneWidget);
-    expect(find.text('Save value'), findsOneWidget);
-
-    await tester.enterText(find.byType(TextField).at(0), '0');
-    await tester.enterText(find.byType(TextField).at(1), '12');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pump();
-
-    expect(find.text('Поточна адреса має бути від 1 до 247.'), findsOneWidget);
+    expect(find.text('Адреса пристрою'), findsOneWidget);
+    expect(find.text('Адреса регістра'), findsOneWidget);
+    expect(find.text('Значення'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(3));
+    expect(find.widgetWithText(FilledButton, 'Записати в регістр'),
+        findsOneWidget);
   });
 
-  testWidgets('blocks equal Modbus current and new addresses', (tester) async {
-    await tester.pumpWidget(
-      _TestApp(
-        diagnosticsLog: InMemoryDiagnosticsLog(),
-        bleService: FakeBleService(),
-        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
-
-    await tester.tap(find.text('Modbus адреса'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '11');
-    await tester.enterText(find.byType(TextField).at(1), '11');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pump();
-
-    expect(
-      find.text('Нова адреса має відрізнятися від поточної.'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('validates Modbus register address range', (tester) async {
-    await tester.pumpWidget(
-      _TestApp(
-        diagnosticsLog: InMemoryDiagnosticsLog(),
-        bleService: FakeBleService(),
-        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
-
-    await tester.tap(find.text('Modbus адреса'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '11');
-    await tester.enterText(find.byType(TextField).at(1), '12');
-    await tester.enterText(find.byType(TextField).at(2), '65536');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pump();
-
-    expect(
-      find.text('Адреса register має бути від 0 до 65535.'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('requires Modbus save register fields together', (tester) async {
-    await tester.pumpWidget(
-      _TestApp(
-        diagnosticsLog: InMemoryDiagnosticsLog(),
-        bleService: FakeBleService(),
-        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
-
-    await tester.tap(find.text('Modbus адреса'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '11');
-    await tester.enterText(find.byType(TextField).at(1), '12');
-    await tester.enterText(find.byType(TextField).at(3), '512');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pump();
-
-    expect(
-      find.text(
-        'Save register address і save value потрібно заповнювати разом.',
-      ),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('submits Modbus address change through API', (tester) async {
-    final apiClient = FakeLocalControllerApiClient();
-
-    await tester.pumpWidget(
-      _TestApp(
+  for (final input in [
+    (
+      slave: '',
+      register: '0',
+      value: '12',
+      error: 'Адреса пристрою має бути від 0 до 255.'
+    ),
+    (
+      slave: '256',
+      register: '0',
+      value: '12',
+      error: 'Адреса пристрою має бути від 0 до 255.'
+    ),
+    (
+      slave: '11',
+      register: '',
+      value: '12',
+      error: 'Адреса регістра має бути від 0 до 65535.'
+    ),
+    (
+      slave: '11',
+      register: '65536',
+      value: '12',
+      error: 'Адреса регістра має бути від 0 до 65535.'
+    ),
+    (
+      slave: '11',
+      register: '0',
+      value: '',
+      error: 'Значення має бути від 0 до 65535.'
+    ),
+    (
+      slave: '11',
+      register: '0',
+      value: '65536',
+      error: 'Значення має бути від 0 до 65535.'
+    ),
+  ]) {
+    testWidgets('rejects invalid Modbus register write input $input',
+        (tester) async {
+      final apiClient = FakeLocalControllerApiClient();
+      await tester.pumpWidget(_TestApp(
         diagnosticsLog: InMemoryDiagnosticsLog(),
         bleService: FakeBleService(),
         localControllerApiClient: apiClient,
         activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
+      ));
 
-    await tester.tap(find.text('Modbus адреса'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '11');
-    await tester.enterText(find.byType(TextField).at(1), '12');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pumpAndSettle();
+      await _fillRegisterWriteForm(tester,
+          slave: input.slave, register: input.register, value: input.value);
+      await _tapWriteRegisterFormButton(tester);
+      await tester.pump();
 
-    expect(apiClient.changedCurrentAddress, 11);
-    expect(apiClient.changedNewAddress, 12);
-    expect(apiClient.changedRegisterAddress, 256);
-    expect(find.text('Адресу 11 змінено на 12.'), findsOneWidget);
-  });
+      expect(find.text(input.error), findsOneWidget);
+      expect(apiClient.writtenRequest, isNull);
+    });
+  }
 
-  testWidgets('submits Modbus address change with save register through API',
-      (tester) async {
-    final apiClient = FakeLocalControllerApiClient();
-
-    await tester.pumpWidget(
-      _TestApp(
+  for (final input in [
+    (slave: 0, register: 0, value: 0),
+    (slave: 255, register: 65535, value: 65535),
+    (slave: 11, register: 256, value: 11),
+  ]) {
+    testWidgets('writes arbitrary Modbus register values $input',
+        (tester) async {
+      final apiClient = FakeLocalControllerApiClient();
+      await tester.pumpWidget(_TestApp(
         diagnosticsLog: InMemoryDiagnosticsLog(),
         bleService: FakeBleService(),
         localControllerApiClient: apiClient,
         activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
+      ));
 
-    await tester.tap(find.text('Modbus адреса'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '11');
-    await tester.enterText(find.byType(TextField).at(1), '12');
-    await tester.enterText(find.byType(TextField).at(3), '512');
-    await tester.enterText(find.byType(TextField).at(4), '1');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pumpAndSettle();
+      await _fillRegisterWriteForm(tester,
+          slave: '${input.slave}',
+          register: '${input.register}',
+          value: '${input.value}');
+      await _tapWriteRegisterFormButton(tester);
+      await tester.pumpAndSettle();
 
-    expect(apiClient.changedCurrentAddress, 11);
-    expect(apiClient.changedNewAddress, 12);
-    expect(apiClient.changedRegisterAddress, 256);
-    expect(apiClient.changedSaveRegisterAddress, 512);
-    expect(apiClient.changedSaveValue, 1);
-    expect(find.text('Адресу 11 змінено на 12.'), findsOneWidget);
-  });
+      expect(apiClient.writtenRequest?.slaveAddress, input.slave);
+      expect(apiClient.writtenRequest?.registerAddress, input.register);
+      expect(apiClient.writtenRequest?.value, input.value);
+      expect(
+          find.text(
+              'Значення ${input.value} записано в регістр ${input.register} пристрою ${input.slave}.'),
+          findsOneWidget);
+    });
+  }
 
-  testWidgets('shows Modbus API failure message', (tester) async {
-    final apiClient = FakeLocalControllerApiClient(
+  for (final failure in [
+    (
       exception: const LocalControllerApiException(),
-    );
-
-    await tester.pumpWidget(
-      _TestApp(
+      message: 'Не вдалося записати значення в регістр.'
+    ),
+    (
+      exception: const LocalControllerConnectionException(),
+      message: 'Не вдалося записати значення в регістр.'
+    ),
+  ]) {
+    testWidgets(
+        'shows Modbus register write failure ${failure.exception.runtimeType}',
+        (tester) async {
+      final apiClient =
+          FakeLocalControllerApiClient(exception: failure.exception);
+      await tester.pumpWidget(_TestApp(
         diagnosticsLog: InMemoryDiagnosticsLog(),
         bleService: FakeBleService(),
         localControllerApiClient: apiClient,
         activeWateringHub: _hub(bleDeviceId: 'ble-42'),
-      ),
-    );
+      ));
 
-    await tester.tap(find.text('Modbus адреса'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '11');
-    await tester.enterText(find.byType(TextField).at(1), '12');
-    await _tapChangeAddressFormButton(tester);
-    await tester.pumpAndSettle();
+      await _fillRegisterWriteForm(tester,
+          slave: '11', register: '256', value: '500');
+      await _tapWriteRegisterFormButton(tester);
+      await tester.pumpAndSettle();
 
-    expect(
-      find.text('Контролер повернув помилку.'),
-      findsOneWidget,
-    );
-  });
+      expect(find.text(failure.message), findsOneWidget);
+    });
+  }
 
   testWidgets('renders diagnostics entries newest first with technical fields',
       (tester) async {
@@ -455,7 +415,7 @@ class _TestApp extends StatelessWidget {
                 activeWateringHubListenable:
                     FakeActiveWateringHubListenable(null),
               ),
-          modbusAddressChangeController: ModbusAddressChangeController(
+          modbusRegisterWriteController: ModbusRegisterWriteController(
             apiClient: apiClient,
             activeControllerAccessProvider: () =>
                 activeWateringHub?.readyAccess,
@@ -481,8 +441,21 @@ WateringHub _hub({required String bleDeviceId}) {
   );
 }
 
-Future<void> _tapChangeAddressFormButton(WidgetTester tester) {
-  return tester.tap(find.widgetWithText(FilledButton, 'Змінити адресу'));
+Future<void> _fillRegisterWriteForm(
+  WidgetTester tester, {
+  required String slave,
+  required String register,
+  required String value,
+}) async {
+  await tester.tap(find.text('Modbus регістр'));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField).at(0), slave);
+  await tester.enterText(find.byType(TextField).at(1), register);
+  await tester.enterText(find.byType(TextField).at(2), value);
+}
+
+Future<void> _tapWriteRegisterFormButton(WidgetTester tester) {
+  return tester.tap(find.widgetWithText(FilledButton, 'Записати в регістр'));
 }
 
 class FakeActiveWateringHubListenable extends ChangeNotifier
@@ -596,11 +569,7 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
   FakeLocalControllerApiClient({this.exception});
 
   final LocalControllerApiException? exception;
-  int? changedCurrentAddress;
-  int? changedNewAddress;
-  int? changedRegisterAddress;
-  int? changedSaveRegisterAddress;
-  int? changedSaveValue;
+  ModbusRegisterWriteRequest? writtenRequest;
 
   @override
   Future<void> checkSettingsAccess({
@@ -646,23 +615,20 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
   }) async {}
 
   @override
-  Future<ModbusAddressChangeResult> changeModbusAddress({
+  Future<ModbusRegisterWriteResult> writeModbusRegister({
     required String hostname,
     required String apiAccessToken,
-    required ModbusAddressChangeRequest request,
+    required ModbusRegisterWriteRequest request,
   }) async {
     final exception = this.exception;
     if (exception != null) {
       throw exception;
     }
-    changedCurrentAddress = request.currentAddress;
-    changedNewAddress = request.newAddress;
-    changedRegisterAddress = request.registerAddress;
-    changedSaveRegisterAddress = request.saveRegisterAddress;
-    changedSaveValue = request.saveValue;
-    return ModbusAddressChangeResult(
-      currentAddress: request.currentAddress,
-      newAddress: request.newAddress,
+    writtenRequest = request;
+    return ModbusRegisterWriteResult(
+      status: 0,
+      slaveAddress: request.slaveAddress,
+      value: request.value,
       registerAddress: request.registerAddress,
     );
   }

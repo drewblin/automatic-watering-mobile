@@ -6,7 +6,7 @@ import '../../watering_hubs/watering_hub.dart';
 
 typedef ActiveControllerAccessProvider = ReadyWateringHubAccess? Function();
 
-enum ModbusAddressChangeStatus {
+enum ModbusRegisterWriteStatus {
   idle,
   invalid,
   submitting,
@@ -15,24 +15,24 @@ enum ModbusAddressChangeStatus {
 }
 
 @immutable
-class ModbusAddressChangeState {
-  const ModbusAddressChangeState({
+class ModbusRegisterWriteState {
+  const ModbusRegisterWriteState({
     required this.status,
     this.message,
   });
 
-  const ModbusAddressChangeState.idle()
-      : status = ModbusAddressChangeStatus.idle,
+  const ModbusRegisterWriteState.idle()
+      : status = ModbusRegisterWriteStatus.idle,
         message = null;
 
-  final ModbusAddressChangeStatus status;
+  final ModbusRegisterWriteStatus status;
   final String? message;
 
-  bool get isSubmitting => status == ModbusAddressChangeStatus.submitting;
+  bool get isSubmitting => status == ModbusRegisterWriteStatus.submitting;
 }
 
-class ModbusAddressChangeController extends ChangeNotifier {
-  ModbusAddressChangeController({
+class ModbusRegisterWriteController extends ChangeNotifier {
+  ModbusRegisterWriteController({
     required LocalControllerApiClient apiClient,
     required ActiveControllerAccessProvider activeControllerAccessProvider,
   })  : _apiClient = apiClient,
@@ -40,27 +40,23 @@ class ModbusAddressChangeController extends ChangeNotifier {
 
   final LocalControllerApiClient _apiClient;
   final ActiveControllerAccessProvider _activeControllerAccessProvider;
-  ModbusAddressChangeState _state = const ModbusAddressChangeState.idle();
+  ModbusRegisterWriteState _state = const ModbusRegisterWriteState.idle();
 
-  ModbusAddressChangeState get state => _state;
+  ModbusRegisterWriteState get state => _state;
 
   Future<bool> submit({
-    required String currentAddressText,
-    required String newAddressText,
+    required String slaveAddressText,
     required String registerAddressText,
-    required String saveRegisterAddressText,
-    required String saveValueText,
+    required String valueText,
   }) async {
     if (_state.isSubmitting) {
       return false;
     }
 
     final request = _buildRequest(
-      currentAddressText: currentAddressText,
-      newAddressText: newAddressText,
+      slaveAddressText: slaveAddressText,
       registerAddressText: registerAddressText,
-      saveRegisterAddressText: saveRegisterAddressText,
-      saveValueText: saveValueText,
+      valueText: valueText,
     );
     if (request == null) {
       return false;
@@ -68,38 +64,38 @@ class ModbusAddressChangeController extends ChangeNotifier {
 
     final access = _activeControllerAccessProvider();
     if (access == null) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.failure,
+      _setState(const ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.failure,
         message: 'Активний контролер ще не налаштовано.',
       ));
       return false;
     }
 
-    _setState(const ModbusAddressChangeState(
-      status: ModbusAddressChangeStatus.submitting,
+    _setState(const ModbusRegisterWriteState(
+      status: ModbusRegisterWriteStatus.submitting,
     ));
 
     try {
-      final result = await _apiClient.changeModbusAddress(
+      final result = await _apiClient.writeModbusRegister(
         hostname: access.hostname,
         apiAccessToken: access.apiAccessToken,
         request: request,
       );
-      _setState(ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.success,
+      _setState(ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.success,
         message:
-            'Адресу ${result.currentAddress} змінено на ${result.newAddress}.',
+            'Значення ${result.value} записано в регістр ${result.registerAddress} пристрою ${result.slaveAddress}.',
       ));
       return true;
     } on LocalControllerApiException {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.failure,
-        message: 'Контролер повернув помилку.',
+      _setState(const ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.failure,
+        message: 'Не вдалося записати значення в регістр.',
       ));
       return false;
     } catch (_) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.failure,
+      _setState(const ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.failure,
         message: 'Не вдалося звʼязатися з контролером.',
       ));
       return false;
@@ -107,101 +103,60 @@ class ModbusAddressChangeController extends ChangeNotifier {
   }
 
   void clearValidationMessage() {
-    if (_state.status != ModbusAddressChangeStatus.invalid) {
+    if (_state.status != ModbusRegisterWriteStatus.invalid) {
       return;
     }
-    _setState(const ModbusAddressChangeState.idle());
+    _setState(const ModbusRegisterWriteState.idle());
   }
 
-  ModbusAddressChangeRequest? _buildRequest({
-    required String currentAddressText,
-    required String newAddressText,
+  ModbusRegisterWriteRequest? _buildRequest({
+    required String slaveAddressText,
     required String registerAddressText,
-    required String saveRegisterAddressText,
-    required String saveValueText,
+    required String valueText,
   }) {
-    final currentAddress = _readAddress(currentAddressText);
-    if (currentAddress == null) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.invalid,
-        message: 'Поточна адреса має бути від 1 до 247.',
-      ));
-      return null;
-    }
-
-    final newAddress = _readAddress(newAddressText);
-    if (newAddress == null) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.invalid,
-        message: 'Нова адреса має бути від 1 до 247.',
-      ));
-      return null;
-    }
-
-    if (currentAddress == newAddress) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.invalid,
-        message: 'Нова адреса має відрізнятися від поточної.',
+    final slaveAddress = _readUint8(slaveAddressText);
+    if (slaveAddress == null) {
+      _setState(const ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.invalid,
+        message: 'Адреса пристрою має бути від 0 до 255.',
       ));
       return null;
     }
 
     final registerAddress = _readUint16(registerAddressText);
     if (registerAddress == null) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.invalid,
-        message: 'Адреса register має бути від 0 до 65535.',
+      _setState(const ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.invalid,
+        message: 'Адреса регістра має бути від 0 до 65535.',
       ));
       return null;
     }
 
-    final hasSaveRegisterAddress = saveRegisterAddressText.trim().isNotEmpty;
-    final hasSaveValue = saveValueText.trim().isNotEmpty;
-    if (hasSaveRegisterAddress != hasSaveValue) {
-      _setState(const ModbusAddressChangeState(
-        status: ModbusAddressChangeStatus.invalid,
-        message:
-            'Save register address і save value потрібно заповнювати разом.',
+    final value = _readUint16(valueText);
+    if (value == null) {
+      _setState(const ModbusRegisterWriteState(
+        status: ModbusRegisterWriteStatus.invalid,
+        message: 'Значення має бути від 0 до 65535.',
       ));
       return null;
     }
 
-    final int? saveRegisterAddress;
-    final int? saveValue;
-    if (hasSaveRegisterAddress) {
-      saveRegisterAddress = _readUint16(saveRegisterAddressText);
-      saveValue = _readUint16(saveValueText);
-      if (saveRegisterAddress == null || saveValue == null) {
-        _setState(const ModbusAddressChangeState(
-          status: ModbusAddressChangeStatus.invalid,
-          message:
-              'Save register address і save value мають бути від 0 до 65535.',
-        ));
-        return null;
-      }
-    } else {
-      saveRegisterAddress = null;
-      saveValue = null;
-    }
-
-    return ModbusAddressChangeRequest(
-      currentAddress: currentAddress,
-      newAddress: newAddress,
+    return ModbusRegisterWriteRequest(
+      slaveAddress: slaveAddress,
       registerAddress: registerAddress,
-      saveRegisterAddress: saveRegisterAddress,
-      saveValue: saveValue,
+      value: value,
     );
   }
 
-  void _setState(ModbusAddressChangeState state) {
+  void _setState(ModbusRegisterWriteState state) {
     _state = state;
     notifyListeners();
   }
 }
 
-int? _readAddress(String value) {
+int? _readUint8(String value) {
   final parsed = int.tryParse(value.trim());
-  if (parsed == null || parsed < 1 || parsed > 247) {
+  if (parsed == null || parsed < 0 || parsed > 255) {
     return null;
   }
   return parsed;

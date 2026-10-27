@@ -74,7 +74,7 @@ Future<void> main() async {
         diagnosticsLog: diagnosticsLog,
         activeWateringHubListenable: activeWateringHubListenable,
       );
-      final modbusAddressChangeController = ModbusAddressChangeController(
+      final modbusRegisterWriteController = ModbusRegisterWriteController(
         apiClient: localControllerApiClient,
         activeControllerAccessProvider: () =>
             stateStore.state.activeWateringHub?.readyAccess,
@@ -101,7 +101,7 @@ Future<void> main() async {
         serviceConsoleDependencies: ServiceConsoleDependencies(
           diagnosticsLog: diagnosticsLog,
           bleLogsController: bleLogsController,
-          modbusAddressChangeController: modbusAddressChangeController,
+          modbusRegisterWriteController: modbusRegisterWriteController,
         ),
         settingsSaveController: settingsSaveController,
         homeDashboardController: HomeDashboardController(

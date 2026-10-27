@@ -57,10 +57,10 @@ abstract interface class LocalControllerApiClient {
     required String apiAccessToken,
   });
 
-  Future<ModbusAddressChangeResult> changeModbusAddress({
+  Future<ModbusRegisterWriteResult> writeModbusRegister({
     required String hostname,
     required String apiAccessToken,
-    required ModbusAddressChangeRequest request,
+    required ModbusRegisterWriteRequest request,
   });
 }
 
@@ -165,26 +165,19 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
   }
 
   @override
-  Future<ModbusAddressChangeResult> changeModbusAddress({
+  Future<ModbusRegisterWriteResult> writeModbusRegister({
     required String hostname,
     required String apiAccessToken,
-    required ModbusAddressChangeRequest request,
+    required ModbusRegisterWriteRequest request,
   }) {
     return _send(
       request: _ControllerRequest.post(
         hostname,
-        '/api/modbus/device-address',
+        '/api/modbus/register/save',
       ),
       apiAccessToken: apiAccessToken,
       body: request.toJson(),
-      parse: (response, controllerRequest) async {
-        await _handleEmptyResponse(response, controllerRequest);
-        return ModbusAddressChangeResult(
-          currentAddress: request.currentAddress,
-          newAddress: request.newAddress,
-          registerAddress: request.registerAddress,
-        );
-      },
+      parse: _handleModbusRegisterWriteResponse,
     );
   }
 
@@ -304,6 +297,31 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       request: request,
       label: 'Empty',
       parseData: (_) => null,
+    );
+  }
+
+  Future<ModbusRegisterWriteResult> _handleModbusRegisterWriteResponse(
+    HttpClientResponse response,
+    _ControllerRequest request,
+  ) async {
+    final body = await _ensureOkBody(response, request);
+    return _parseEnvelope(
+      body: body,
+      statusCode: response.statusCode,
+      request: request,
+      label: 'Modbus register write',
+      parseData: (data) {
+        if (data is! Map<String, Object?>) {
+          throw const FormatException(
+              'Modbus register write data must be an object');
+        }
+        final result = ModbusRegisterWriteResult.fromJson(data);
+        if (result.status != 0) {
+          throw FormatException(
+              'Failed to write Modbus register: status ${result.status}');
+        }
+        return result;
+      },
     );
   }
 

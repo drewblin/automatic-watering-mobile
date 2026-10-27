@@ -3,24 +3,22 @@ import 'package:flutter/services.dart';
 
 import 'modbus_address_change_controller.dart';
 
-class ModbusAddressTab extends StatefulWidget {
-  const ModbusAddressTab({
+class ModbusRegisterWriteTab extends StatefulWidget {
+  const ModbusRegisterWriteTab({
     required this.controller,
     super.key,
   });
 
-  final ModbusAddressChangeController controller;
+  final ModbusRegisterWriteController controller;
 
   @override
-  State<ModbusAddressTab> createState() => _ModbusAddressTabState();
+  State<ModbusRegisterWriteTab> createState() => _ModbusRegisterWriteTabState();
 }
 
-class _ModbusAddressTabState extends State<ModbusAddressTab> {
-  final _currentAddressController = TextEditingController();
-  final _newAddressController = TextEditingController();
-  final _registerAddressController = TextEditingController(text: '256');
-  final _saveRegisterAddressController = TextEditingController();
-  final _saveValueController = TextEditingController();
+class _ModbusRegisterWriteTabState extends State<ModbusRegisterWriteTab> {
+  final _slaveAddressController = TextEditingController();
+  final _registerAddressController = TextEditingController(text: '0');
+  final _valueController = TextEditingController();
 
   @override
   void initState() {
@@ -29,7 +27,7 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
   }
 
   @override
-  void didUpdateWidget(ModbusAddressTab oldWidget) {
+  void didUpdateWidget(ModbusRegisterWriteTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.controller != oldWidget.controller) {
       oldWidget.controller.removeListener(_refresh);
@@ -40,11 +38,9 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
   @override
   void dispose() {
     widget.controller.removeListener(_refresh);
-    _currentAddressController.dispose();
-    _newAddressController.dispose();
+    _slaveAddressController.dispose();
     _registerAddressController.dispose();
-    _saveRegisterAddressController.dispose();
-    _saveValueController.dispose();
+    _valueController.dispose();
     super.dispose();
   }
 
@@ -56,18 +52,16 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
 
   Future<void> _submit() async {
     final success = await widget.controller.submit(
-      currentAddressText: _currentAddressController.text,
-      newAddressText: _newAddressController.text,
+      slaveAddressText: _slaveAddressController.text,
       registerAddressText: _registerAddressController.text,
-      saveRegisterAddressText: _saveRegisterAddressController.text,
-      saveValueText: _saveValueController.text,
+      valueText: _valueController.text,
     );
     if (!mounted || !success) {
       return;
     }
-    if (widget.controller.state.status == ModbusAddressChangeStatus.success) {
+    if (widget.controller.state.status == ModbusRegisterWriteStatus.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Modbus адресу змінено.')),
+        const SnackBar(content: Text('Значення записано в регістр.')),
       );
     }
   }
@@ -77,9 +71,9 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
     final state = widget.controller.state;
     final message = state.message;
     final validationMessage =
-        state.status == ModbusAddressChangeStatus.invalid ? message : null;
+        state.status == ModbusRegisterWriteStatus.invalid ? message : null;
     final resultMessage =
-        state.status == ModbusAddressChangeStatus.invalid ? null : message;
+        state.status == ModbusRegisterWriteStatus.invalid ? null : message;
 
     return SafeArea(
       top: false,
@@ -88,21 +82,9 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
         children: [
           const SizedBox(height: 16),
           TextField(
-            controller: _currentAddressController,
+            controller: _slaveAddressController,
             decoration: const InputDecoration(
-              labelText: 'Поточна адреса девайса',
-              border: OutlineInputBorder(),
-            ),
-            enabled: !state.isSubmitting,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => widget.controller.clearValidationMessage(),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _newAddressController,
-            decoration: const InputDecoration(
-              labelText: 'Нова адреса',
+              labelText: 'Адреса пристрою',
               border: OutlineInputBorder(),
             ),
             enabled: !state.isSubmitting,
@@ -114,7 +96,7 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
           TextField(
             controller: _registerAddressController,
             decoration: const InputDecoration(
-              labelText: 'Адреса register',
+              labelText: 'Адреса регістра',
               border: OutlineInputBorder(),
             ),
             enabled: !state.isSubmitting,
@@ -124,21 +106,9 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: _saveRegisterAddressController,
+            controller: _valueController,
             decoration: const InputDecoration(
-              labelText: 'Save register address',
-              border: OutlineInputBorder(),
-            ),
-            enabled: !state.isSubmitting,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => widget.controller.clearValidationMessage(),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _saveValueController,
-            decoration: const InputDecoration(
-              labelText: 'Save value',
+              labelText: 'Значення',
               border: OutlineInputBorder(),
             ),
             enabled: !state.isSubmitting,
@@ -163,15 +133,15 @@ class _ModbusAddressTabState extends State<ModbusAddressTab> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.swap_horiz),
-              label: const Text('Змінити адресу'),
+                  : const Icon(Icons.edit_outlined),
+              label: const Text('Записати в регістр'),
             ),
           ),
           if (resultMessage != null) ...[
             const SizedBox(height: 16),
             _OperationResult(
               message: resultMessage,
-              isSuccess: state.status == ModbusAddressChangeStatus.success,
+              isSuccess: state.status == ModbusRegisterWriteStatus.success,
             ),
           ],
         ],
