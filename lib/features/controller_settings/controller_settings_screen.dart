@@ -10,6 +10,9 @@ import 'controller_settings_save_controller.dart';
 import 'device_objects.dart';
 import 'settings_response_data.dart';
 
+const _valveGpioPins = {18, 19, 21, 22, 23, 25, 26, 27};
+const _flowSensorGpioPins = {34, 35, 36, 39};
+
 class ControllerSettingsScreen extends StatefulWidget {
   const ControllerSettingsScreen({
     required this.settings,
@@ -553,7 +556,7 @@ class _WaterCountersEditor extends StatelessWidget {
               ? () => onChanged(() {
                     draft.magistralWaterCounter = magistral == null
                         ? WaterCounterSettingDraft(
-                            pin: '',
+                            pin: _flowSensorGpioPins.first.toString(),
                             name: '',
                             litersPerTick: '',
                           )
@@ -603,7 +606,7 @@ class _WaterCountersEditor extends StatelessWidget {
           onAction: enabled
               ? () => onChanged(() => draft.leafWaterCounters.add(
                     WaterCounterSettingDraft(
-                      pin: '',
+                      pin: _flowSensorGpioPins.first.toString(),
                       name: '',
                       litersPerTick: '',
                     ),
@@ -657,7 +660,7 @@ class _ValvesEditor extends StatelessWidget {
       onAction: enabled
           ? () => onChanged(() => draft.valves.add(
                 ValveSettingDraft(
-                  pin: '',
+                  pin: _valveGpioPins.first.toString(),
                   name: '',
                   soilSensorSlaveAddress: null,
                 ),
@@ -671,10 +674,10 @@ class _ValvesEditor extends StatelessWidget {
             onRemove: () => onChanged(() => draft.valves.removeAt(i)),
             child: _FieldColumn(
               children: [
-                _NumberField(
+                _GpioPinChoice(
                   scrollKey: keyFor('valves.$i.pin'),
                   enabled: enabled,
-                  label: 'GPIO pin',
+                  allowedPins: _valveGpioPins,
                   value: draft.valves[i].pin,
                   error: validation['valves.$i.pin'],
                   onChanged: (value) =>
@@ -797,10 +800,10 @@ class _WaterCounterEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     return _FieldColumn(
       children: [
-        _NumberField(
+        _GpioPinChoice(
           scrollKey: keyFor('$prefix.pin'),
           enabled: enabled,
-          label: 'GPIO pin',
+          allowedPins: _flowSensorGpioPins,
           value: counter.pin,
           error: validation['$prefix.pin'],
           onChanged: (value) => onChanged(() => counter.pin = value),
@@ -980,6 +983,53 @@ class _StatusBanner extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _GpioPinChoice extends StatelessWidget {
+  const _GpioPinChoice({
+    required this.enabled,
+    required this.allowedPins,
+    required this.value,
+    required this.error,
+    required this.onChanged,
+    required this.scrollKey,
+  });
+
+  final bool enabled;
+  final Set<int> allowedPins;
+  final String value;
+  final String? error;
+  final ValueChanged<String> onChanged;
+  final GlobalKey scrollKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final pin = int.tryParse(value);
+    return KeyedSubtree(
+      key: scrollKey,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey(value),
+        initialValue: allowedPins.contains(pin) ? pin.toString() : null,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          labelText: 'GPIO pin',
+          errorText: error,
+        ),
+        hint: const Text('Оберіть GPIO'),
+        items: [
+          for (final pin in allowedPins)
+            DropdownMenuItem(value: '$pin', child: Text('GPIO $pin')),
+        ],
+        onChanged: enabled
+            ? (pin) {
+                if (pin != null) {
+                  onChanged(pin);
+                }
+              }
+            : null,
       ),
     );
   }

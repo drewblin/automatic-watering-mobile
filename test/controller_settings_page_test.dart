@@ -4,6 +4,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_form_draft.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_save_controller.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_screen.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/device_objects.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
@@ -11,10 +12,58 @@ import 'package:automatic_watering_mobile/features/local_controller/modbus_addre
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
+import 'app_test_composition.dart';
 import 'controller_settings_sync_test.dart';
 
 void main() {
+  testWidgets('chooses GPIO pins for valves and both flow sensor types',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 7000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final composition = TestAppComposition();
+    addTearDown(composition.appController.dispose);
+    final settings = SettingsResponseData.fromJson({
+      ...settingsResponseDataJson,
+      'settings': {
+        ...settingsJson,
+        'leafWaterCounterSettings': [
+          {'pin': 34, 'name': 'Гілка', 'litersPerTick': 1.0},
+        ],
+      },
+    });
+    await tester.pumpWidget(MaterialApp(
+      home: ControllerSettingsScreen(
+        settings: settings,
+        deviceObjects: const [],
+        saveController: composition.appController.settingsSaveController,
+        serviceConsoleDependencies:
+            composition.appController.serviceConsoleDependencies,
+      ),
+    ));
+
+    final pinChoices = find.widgetWithText(
+      DropdownButtonFormField<String>,
+      'GPIO pin',
+    );
+    expect(pinChoices, findsNWidgets(3));
+
+    // The main counter, branch counter, and valve appear in this order.
+    for (final choice in [(0, 'GPIO 36'), (1, 'GPIO 39'), (2, 'GPIO 19')]) {
+      await tester.tap(pinChoices.at(choice.$1));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(choice.$2).last);
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(pinChoices.at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('GPIO 36').last);
+    await tester.pumpAndSettle();
+    expect(find.text('GPIO pin вже використовується.'), findsNWidgets(2));
+  });
+
   test('builds typed payload for PUT /api/settings', () async {
     final client = RecordingSettingsApiClient();
     final repository = ControllerSettingsRepository(apiClient: client);
@@ -51,6 +100,17 @@ void main() {
       validation['valves.0.soilSensorSlaveAddress'],
       'Оберіть існуючий датчик вологості.',
     );
+  });
+
+  test('does not reject unique GPIO pins loaded from the controller', () {
+    final draft = ControllerSettingsFormDraft.fromSettings(
+      SettingsResponseData.fromJson(settingsResponseDataJson).settings,
+    );
+    draft.leafWaterCounters.add(
+      WaterCounterSettingDraft(pin: '33', name: 'Гілка', litersPerTick: '1'),
+    );
+
+    expect(draft.validate().isValid, isTrue);
   });
 
   test('remote log fields are optional in settings form', () {

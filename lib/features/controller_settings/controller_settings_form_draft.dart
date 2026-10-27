@@ -414,7 +414,6 @@ class ValveSettingDraft {
   }
 
   void addErrors(Map<String, String> errors, String prefix) {
-    _readInt(pin, '$prefix.pin', 'GPIO pin має бути цілим числом.', errors);
     _readRequiredName(name, '$prefix.name', errors);
   }
 }
@@ -507,7 +506,6 @@ class WaterCounterSettingDraft {
   }
 
   void addErrors(Map<String, String> errors, String prefix) {
-    _readInt(pin, '$prefix.pin', 'GPIO pin має бути цілим числом.', errors);
     _readRequiredName(name, '$prefix.name', errors);
     final value = double.tryParse(litersPerTick);
     if (value == null || !value.isFinite || value <= 0) {
@@ -562,19 +560,6 @@ int? _readIntRange(
   if (parsed == null || parsed < min || parsed > max) {
     errors[key] = message;
     return null;
-  }
-  return parsed;
-}
-
-int? _readInt(
-  String value,
-  String key,
-  String message,
-  Map<String, String> errors,
-) {
-  final parsed = int.tryParse(value);
-  if (parsed == null) {
-    errors[key] = message;
   }
   return parsed;
 }
