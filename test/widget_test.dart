@@ -128,7 +128,6 @@ void main() {
       id: 'hub-aa-bb-cc',
       displayName: 'Automatic Watering Hub',
       bleDeviceId: 'AA:BB:CC',
-      lastKnownIpAddress: null,
       lastKnownHostname: '',
       apiAccessToken: null,
       serverDeviceId: null,
@@ -143,7 +142,6 @@ void main() {
     expect(find.text('Automatic Watering Hub'), findsNothing);
 
     final completeHub = incompleteHub.copyWith(
-      lastKnownIpAddress: '192.168.1.42',
       lastKnownHostname: 'watering-hub-a1b2c3.local',
       updatedAt: DateTime.utc(2026, 1, 2),
     );
@@ -170,7 +168,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Automatic Watering Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: '192.168.1.42',
         lastKnownHostname: 'watering-hub-a1b2c3.local',
         apiAccessToken: null,
         serverDeviceId: null,
@@ -230,7 +227,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Automatic Watering Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: '192.168.1.42',
         lastKnownHostname: 'watering-hub-a1b2c3.local',
         apiAccessToken: null,
         serverDeviceId: null,
@@ -290,7 +286,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Automatic Watering Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: null,
         lastKnownHostname: '',
         apiAccessToken: null,
         serverDeviceId: null,
@@ -331,7 +326,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Automatic Watering Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: '192.168.1.42',
         lastKnownHostname: 'watering-hub-a1b2c3.local',
         apiAccessToken: null,
         serverDeviceId: null,
@@ -421,13 +415,13 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     getCalls += 1;
@@ -436,14 +430,14 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     final receivedAt = DateTime.utc(2026, 8, 3, 10);
@@ -493,13 +487,13 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -507,7 +501,7 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {
@@ -536,7 +530,7 @@ class FlakySettingsApiClient extends FakeSettingsApiClient {
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     _calls += 1;
@@ -544,7 +538,7 @@ class FlakySettingsApiClient extends FakeSettingsApiClient {
       throw const LocalControllerApiException();
     }
     return super.getSettings(
-      ipAddress: ipAddress,
+      hostname: hostname,
       apiAccessToken: apiAccessToken,
     );
   }

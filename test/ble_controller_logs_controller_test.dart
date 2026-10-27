@@ -309,7 +309,6 @@ WateringHub _hub({required String bleDeviceId}) {
     id: 'hub-1',
     displayName: 'Теплиця',
     bleDeviceId: bleDeviceId,
-    lastKnownIpAddress: '192.168.1.42',
     lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,

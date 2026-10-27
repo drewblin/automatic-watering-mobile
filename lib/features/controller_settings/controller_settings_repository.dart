@@ -12,7 +12,7 @@ class ControllerSettingsRepository {
 
   Future<SettingsResponseData> syncSettings(ReadyWateringHubAccess access) {
     return _apiClient.getSettings(
-      ipAddress: access.ipAddress,
+      hostname: access.hostname,
       apiAccessToken: access.apiAccessToken,
     );
   }
@@ -22,7 +22,7 @@ class ControllerSettingsRepository {
     ControllerSettings settings,
   ) async {
     await _apiClient.putSettings(
-      ipAddress: access.ipAddress,
+      hostname: access.hostname,
       apiAccessToken: access.apiAccessToken,
       settings: settings,
     );

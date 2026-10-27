@@ -27,7 +27,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Automatic Watering Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: '192.168.1.42',
         lastKnownHostname: 'watering-hub-a1b2c3.local',
         apiAccessToken: null,
         serverDeviceId: null,
@@ -47,7 +46,7 @@ void main() {
 
     await appController.initialize();
 
-    expect(client.ipAddress, '192.168.1.42');
+    expect(client.hostname, 'watering-hub-a1b2c3.local');
     expect(client.apiAccessToken, 'token');
     expect(appController.state.settings?.syncedAt, isNotNull);
     expect(appController.state.deviceObjects.map((object) => object.id), [
@@ -102,35 +101,35 @@ const settingsJson = {
 };
 
 class FakeSettingsApiClient implements LocalControllerApiClient {
-  String? ipAddress;
+  String? hostname;
   String? apiAccessToken;
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
-    this.ipAddress = ipAddress;
+    this.hostname = hostname;
     this.apiAccessToken = apiAccessToken;
     return SettingsResponseData.fromJson(settingsResponseDataJson);
   }
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     return const [];
@@ -138,13 +137,13 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -152,7 +151,7 @@ class FakeSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

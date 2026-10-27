@@ -100,7 +100,6 @@ void main() {
         id: 'hub-old-device',
         displayName: 'Existing hub',
         bleDeviceId: 'OLD:DEVICE',
-        lastKnownIpAddress: '192.168.1.50',
         lastKnownHostname: 'old-controller.local',
         apiAccessToken: 'token',
         serverDeviceId: 'server-device',
@@ -142,7 +141,6 @@ void main() {
     expect(storage.activeHub?.id, 'hub-new-device');
     expect(storage.activeHub?.displayName, 'Automatic Watering Hub');
     expect(storage.activeHub?.bleDeviceId, 'NEW:DEVICE');
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
     expect(storage.activeHub?.apiAccessToken, isNull);
     expect(storage.activeHub?.serverDeviceId, isNull);
     expect(storage.activeHub?.onboardingCompletedAt, isNotNull);
@@ -451,7 +449,6 @@ void main() {
     await controller.bootstrapControllerAccess();
 
     expect(controller.state, isA<ControllerAccessReady>());
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
     expect(storage.activeHub?.apiAccessToken, isNull);
     expect(storage.activeHub?.onboardingCompletedAt, isNotNull);
     expect(tokenStorage.tokens[storage.activeHub!.id], validToken);
@@ -506,11 +503,10 @@ void main() {
     await controller.bootstrapControllerAccess();
 
     expect(controller.state, isA<ControllerAccessReady>());
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
     expect(storage.activeHub?.lastKnownHostname, 'espirrigation.local');
     expect(
-      composition.appController.state.activeWateringHub?.readyAccess?.ipAddress,
-      '192.168.1.42',
+      composition.appController.state.activeWateringHub?.readyAccess?.hostname,
+      'espirrigation.local',
     );
     expect(localClient.checkedIpAddress, isNull);
     expect(
@@ -559,7 +555,6 @@ void main() {
 
     expect(controller.state, isA<ControllerAccessReady>());
     expect(storage.activeHub?.lastKnownHostname, 'espirrigation.local');
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.77');
     expect(localClient.checkedIpAddresses, isEmpty);
     expect(diagnosticsLog.entries, isEmpty);
   });
@@ -603,11 +598,10 @@ void main() {
 
     expect(controller.state, isA<ControllerAccessReady>());
     expect(storage.activeHub?.lastKnownHostname, 'espirrigation.local');
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.77');
     expect(localClient.checkedIpAddresses, isEmpty);
     expect(
-      composition.appController.state.activeWateringHub?.readyAccess?.ipAddress,
-      '192.168.1.77',
+      composition.appController.state.activeWateringHub?.readyAccess?.hostname,
+      'espirrigation.local',
     );
     expect(diagnosticsLog.entries, isEmpty);
   });
@@ -774,7 +768,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Saved Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: '192.168.1.10',
         lastKnownHostname: 'old-controller.local',
         apiAccessToken: null,
         serverDeviceId: 'server-device',
@@ -815,7 +808,6 @@ void main() {
     expect(controller.state, isA<ControllerAccessReady>());
     expect(bleService.reconnectCalls, 1);
     expect(storage.activeHub?.id, 'hub-aa-bb-cc');
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
     expect(storage.activeHub?.lastKnownHostname, 'watering-hub-a1b2c3.local');
     expect(storage.activeHub?.serverDeviceId, 'server-device');
     expect(storage.activeHub?.apiAccessToken, isNull);
@@ -829,7 +821,6 @@ void main() {
       id: 'hub-aa-bb-cc',
       displayName: 'Saved Hub',
       bleDeviceId: 'AA:BB:CC',
-      lastKnownIpAddress: '192.168.1.10',
       lastKnownHostname: 'saved-controller.local',
       apiAccessToken: validToken,
       serverDeviceId: null,
@@ -871,7 +862,6 @@ void main() {
         id: 'hub-aa-bb-cc',
         displayName: 'Saved Hub',
         bleDeviceId: 'AA:BB:CC',
-        lastKnownIpAddress: '192.168.1.10',
         lastKnownHostname: 'saved-controller.local',
         apiAccessToken: null,
         serverDeviceId: 'server-device',
@@ -922,7 +912,6 @@ void main() {
     expect(storage.activeHub?.id, 'hub-aa-bb-cc');
     expect(storage.activeHub?.displayName, 'Same Controller');
     expect(storage.activeHub?.bleDeviceId, 'DD:EE:FF');
-    expect(storage.activeHub?.lastKnownIpAddress, '192.168.1.42');
     expect(storage.activeHub?.serverDeviceId, 'server-device');
     expect(tokenStorage.tokens['hub-aa-bb-cc'], validToken);
   });
@@ -1205,12 +1194,12 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     checkCalls += 1;
-    checkedIpAddress = ipAddress;
-    checkedIpAddresses.add(ipAddress);
+    checkedIpAddress = hostname;
+    checkedIpAddresses.add(hostname);
     checkedToken = apiAccessToken;
     if (exceptions.isNotEmpty) {
       throw exceptions.removeAt(0);
@@ -1223,11 +1212,11 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     await checkSettingsAccess(
-      ipAddress: ipAddress,
+      hostname: hostname,
       apiAccessToken: apiAccessToken,
     );
     return SettingsResponseData.fromJson({
@@ -1273,14 +1262,14 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     return const [];
@@ -1288,13 +1277,13 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -1302,7 +1291,7 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

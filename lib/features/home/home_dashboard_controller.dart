@@ -91,7 +91,7 @@ class HomeDashboardController extends ChangeNotifier {
       );
 
       final rawMetrics = await _apiClient.getSensorMetrics(
-        ipAddress: access.ipAddress,
+        hostname: access.hostname,
         apiAccessToken: access.apiAccessToken,
       );
       _metrics = _mapMetrics(rawMetrics, deviceObjects);
@@ -141,7 +141,7 @@ class HomeDashboardController extends ChangeNotifier {
     );
     try {
       await _apiClient.openValveForTime(
-        ipAddress: access.ipAddress,
+        hostname: access.hostname,
         apiAccessToken: access.apiAccessToken,
         pin: valve.pin,
         seconds: seconds,
@@ -176,7 +176,7 @@ class HomeDashboardController extends ChangeNotifier {
     ));
     try {
       await _apiClient.closeAllValves(
-        ipAddress: access.ipAddress,
+        hostname: access.hostname,
         apiAccessToken: access.apiAccessToken,
       );
       _setCloseAllValvesState(const ManualValveCommandState(

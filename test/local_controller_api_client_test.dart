@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:automatic_watering_mobile/features/local_controller/controller_address_service.dart';
+import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
 
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
@@ -16,12 +18,14 @@ void main() {
       'error': null,
     });
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: httpClient,
       diagnosticsLog: InMemoryDiagnosticsLog(),
     );
 
     await client.closeAllValves(
-      ipAddress: '192.168.1.42',
+      hostname: '192.168.1.42',
       apiAccessToken: 'secret-token',
     );
 
@@ -39,6 +43,8 @@ void main() {
   ]) {
     test('close all valves rejects failure with HTTP $status', () async {
       final client = HttpLocalControllerApiClient(
+        addressService:
+            ControllerAddressService(mdnsControllerResolver: _Resolver()),
         httpClient: _FakeHttpClient(
           statusCode: status,
           responseBody: {
@@ -52,7 +58,7 @@ void main() {
 
       await expectLater(
         client.closeAllValves(
-            ipAddress: '192.168.1.42', apiAccessToken: 'token'),
+            hostname: '192.168.1.42', apiAccessToken: 'token'),
         throwsA(isA<LocalControllerApiException>()),
       );
     });
@@ -62,6 +68,8 @@ void main() {
       () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: _FakeHttpClient(
         responseBody: {
           'success': false,
@@ -74,7 +82,7 @@ void main() {
     );
 
     await expectLater(
-      client.getSettings(ipAddress: '192.168.1.42', apiAccessToken: 'token'),
+      client.getSettings(hostname: '192.168.1.42', apiAccessToken: 'token'),
       throwsA(isA<LocalControllerApiException>()),
     );
 
@@ -85,6 +93,8 @@ void main() {
   test('empty response success false logs controller error', () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: _FakeHttpClient(
         responseBody: {
           'success': false,
@@ -98,7 +108,7 @@ void main() {
 
     await expectLater(
       client.openValveForTime(
-        ipAddress: '192.168.1.42',
+        hostname: '192.168.1.42',
         apiAccessToken: 'token',
         pin: 17,
         seconds: 30,
@@ -114,6 +124,8 @@ void main() {
       () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: _FakeHttpClient(
         responseBody: {
           'success': false,
@@ -127,7 +139,7 @@ void main() {
 
     await expectLater(
       client.changeModbusAddress(
-        ipAddress: '192.168.1.42',
+        hostname: '192.168.1.42',
         apiAccessToken: 'token',
         request: const ModbusAddressChangeRequest(
           currentAddress: 11,
@@ -145,6 +157,8 @@ void main() {
       () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: _FakeHttpClient(
         responseBody: {
           'success': true,
@@ -157,7 +171,7 @@ void main() {
     );
 
     await client.openValveForTime(
-      ipAddress: '192.168.1.42',
+      hostname: '192.168.1.42',
       apiAccessToken: 'token',
       pin: 17,
       seconds: 30,
@@ -176,13 +190,15 @@ void main() {
       },
     );
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: httpClient,
       diagnosticsLog: diagnosticsLog,
       timeout: const Duration(seconds: 1),
     );
 
     final result = await client.changeModbusAddress(
-      ipAddress: '192.168.1.42',
+      hostname: '192.168.1.42',
       apiAccessToken: 'token',
       request: const ModbusAddressChangeRequest(
         currentAddress: 11,
@@ -214,13 +230,15 @@ void main() {
       },
     );
     final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
       httpClient: httpClient,
       diagnosticsLog: diagnosticsLog,
       timeout: const Duration(seconds: 1),
     );
 
     await client.changeModbusAddress(
-      ipAddress: '192.168.1.42',
+      hostname: '192.168.1.42',
       apiAccessToken: 'token',
       request: const ModbusAddressChangeRequest(
         currentAddress: 11,
@@ -353,4 +371,11 @@ class _FakeHttpHeaders implements HttpHeaders {
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Resolver implements MdnsControllerResolver {
+  @override
+  Future<String?> resolve(
+          {required String hostname, required String localHostname}) async =>
+      '192.168.1.42';
 }

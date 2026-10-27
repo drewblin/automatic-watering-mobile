@@ -138,7 +138,6 @@ class BleControllerAccessFlow {
           fixedAccessIpAddress: fixedAccessIpAddress,
         );
         final hub = _session.activeWateringHub!.copyWith(
-          lastKnownIpAddress: fixedAccessIpAddress,
           lastKnownHostname: wifiAddress.localHostname,
           updatedAt: DateTime.now().toUtc(),
         );
@@ -250,7 +249,6 @@ class BleControllerAccessFlow {
       id: _hubIdFromBleDeviceId(device.id),
       displayName: device.displayName,
       bleDeviceId: device.id,
-      lastKnownIpAddress: null,
       lastKnownHostname: '',
       apiAccessToken: null,
       serverDeviceId: null,

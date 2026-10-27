@@ -138,7 +138,6 @@ Future<void> _pumpDashboard(
     id: 'hub-aa-bb-cc',
     displayName: 'Контролер поливу',
     bleDeviceId: 'AA:BB:CC',
-    lastKnownIpAddress: '192.168.1.42',
     lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,

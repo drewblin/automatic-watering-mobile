@@ -26,7 +26,7 @@ void main() {
     expect(controller.isClosingAllValves, isTrue);
     await Future<void>.delayed(Duration.zero);
     expect(api.closeAllCalls, 1);
-    expect(api.closeIpAddress, '192.168.1.42');
+    expect(api.closeHostname, 'watering-hub-a1b2c3.local');
     expect(api.closeApiAccessToken, 'token');
     expect(await controller.closeAllValves(), isFalse);
     expect(api.closeAllCalls, 1);
@@ -247,7 +247,6 @@ WateringHub _hub() {
     id: 'hub-aa-bb-cc',
     displayName: 'Automatic Watering Hub',
     bleDeviceId: 'AA:BB:CC',
-    lastKnownIpAddress: '192.168.1.42',
     lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,
@@ -288,16 +287,16 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
   Completer<void>? openCompletion;
   LocalControllerApiException? closeException;
   int closeAllCalls = 0;
-  String? closeIpAddress;
+  String? closeHostname;
   String? closeApiAccessToken;
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     closeAllCalls++;
-    closeIpAddress = ipAddress;
+    closeHostname = hostname;
     closeApiAccessToken = apiAccessToken;
     if (closeException case final error?) throw error;
     await closeCompletion?.future;
@@ -305,13 +304,13 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     calls.add('settings');
@@ -320,7 +319,7 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     calls.add('metrics');
@@ -359,14 +358,14 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -379,7 +378,7 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

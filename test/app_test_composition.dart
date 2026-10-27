@@ -12,7 +12,6 @@ import 'package:automatic_watering_mobile/features/controller_settings/settings_
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
-import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
@@ -28,7 +27,6 @@ class TestAppComposition {
     InMemoryDiagnosticsLog? diagnosticsLog,
     BleService? bleService,
     LocalControllerApiClient? localControllerApiClient,
-    MdnsControllerResolver? mdnsControllerResolver,
   })  : wateringHubStorage = wateringHubStorage ?? InMemoryWateringHubStorage(),
         tokenStorage = tokenStorage ?? InMemoryWateringHubTokenStorage(),
         diagnosticsLog = diagnosticsLog ?? InMemoryDiagnosticsLog() {
@@ -43,7 +41,6 @@ class TestAppComposition {
       wateringHubStorage: this.wateringHubStorage,
       tokenStorage: this.tokenStorage,
       controllerSettingsRepository: controllerSettingsRepository,
-      mdnsControllerResolver: mdnsControllerResolver ?? _NoopMdnsResolver(),
       diagnosticsLog: this.diagnosticsLog,
     );
     onboarding = OnboardingAppService(
@@ -92,30 +89,18 @@ class TestAppComposition {
   late final OnboardingAppService onboarding;
 }
 
-class _NoopMdnsResolver implements MdnsControllerResolver {
-  const _NoopMdnsResolver();
-
-  @override
-  Future<String?> resolve({
-    required String hostname,
-    required String localHostname,
-  }) async {
-    return null;
-  }
-}
-
 class _NoopLocalControllerApiClient implements LocalControllerApiClient {
   const _NoopLocalControllerApiClient();
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) {
     throw const LocalControllerApiException();
@@ -123,14 +108,14 @@ class _NoopLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     return const [];
@@ -138,13 +123,13 @@ class _NoopLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -152,7 +137,7 @@ class _NoopLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

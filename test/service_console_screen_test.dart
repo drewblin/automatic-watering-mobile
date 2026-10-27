@@ -472,7 +472,6 @@ WateringHub _hub({required String bleDeviceId}) {
     id: 'hub-1',
     displayName: 'Теплиця',
     bleDeviceId: bleDeviceId,
-    lastKnownIpAddress: '192.168.1.42',
     lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,
@@ -605,13 +604,13 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) {
     throw UnimplementedError();
@@ -619,14 +618,14 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     return const [];
@@ -634,13 +633,13 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -648,7 +647,7 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

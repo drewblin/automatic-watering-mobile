@@ -9,7 +9,6 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
-import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
@@ -38,7 +37,6 @@ void main() {
       controllerSettingsRepository: ControllerSettingsRepository(
         apiClient: client,
       ),
-      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: diagnosticsLog,
     );
 
@@ -74,7 +72,6 @@ void main() {
       controllerSettingsRepository: ControllerSettingsRepository(
         apiClient: client,
       ),
-      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: diagnosticsLog,
     );
 
@@ -93,7 +90,7 @@ void main() {
     );
   });
 
-  test('startup fails when saved controller IP is unreachable', () async {
+  test('startup preserves profile when controller is unreachable', () async {
     final hub = _hubWithoutPlainToken();
     SharedPreferences.setMockInitialValues({
       'watering_hubs.active': jsonEncode(hub.toJson()),
@@ -113,7 +110,6 @@ void main() {
       controllerSettingsRepository: ControllerSettingsRepository(
         apiClient: client,
       ),
-      mdnsControllerResolver: const FakeMdnsControllerResolver(),
       diagnosticsLog: diagnosticsLog,
     );
 
@@ -127,10 +123,6 @@ void main() {
     expect(stateStore.state.activeWateringHub?.apiAccessToken, validToken);
     expect(preferences.getString('watering_hubs.active'), isNotNull);
     expect(tokenStorage.tokens['hub-aa-bb-cc'], validToken);
-    expect(
-      diagnosticsLog.entries.map((entry) => entry.message),
-      contains('Використовуємо збережену IP-адресу контролера.'),
-    );
 
     stateStore.setState(
       AppState.readyForOnboarding(
@@ -143,91 +135,31 @@ void main() {
     expect(stateStore.state.activeWateringHub?.apiAccessToken, validToken);
   });
 
-  test('startup records how saved controller access was used', () async {
+  test('startup uses hostname and leaves legacy persisted IP untouched',
+      () async {
     final hub = _hubWithoutPlainToken();
-    SharedPreferences.setMockInitialValues({
-      'watering_hubs.active': jsonEncode(hub.toJson()),
-    });
+    final savedJson =
+        jsonEncode({...hub.toJson(), 'lastKnownIpAddress': '192.168.1.42'});
+    SharedPreferences.setMockInitialValues({'watering_hubs.active': savedJson});
     final preferences = await SharedPreferences.getInstance();
     final stateStore = AppStateStore();
-    final tokenStorage = InMemoryWateringHubTokenStorage()
-      ..tokens['hub-aa-bb-cc'] = validToken;
-    final diagnosticsLog = InMemoryDiagnosticsLog();
     final client = RecordingStartupApiClient();
     final startup = AppStartupService(
       stateStore: stateStore,
       wateringHubStorage: SharedPreferencesWateringHubStorage(preferences),
-      tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: client,
-      ),
-      mdnsControllerResolver: const FakeMdnsControllerResolver(),
-      diagnosticsLog: diagnosticsLog,
+      tokenStorage: InMemoryWateringHubTokenStorage()
+        ..tokens[hub.id] = validToken,
+      controllerSettingsRepository:
+          ControllerSettingsRepository(apiClient: client),
+      diagnosticsLog: InMemoryDiagnosticsLog(),
     );
-
     await startup.initialize();
-
     expect(stateStore.state.startupStatus, AppStartupStatus.ready);
-    expect(client.getCalls, 1);
-    expect(
-      diagnosticsLog.entries.map((entry) => entry.message),
-      contains('Використовуємо збережену IP-адресу контролера.'),
-    );
-    expect(diagnosticsLog.entries.first.details, contains('192.168.1.42'));
-    expect(
-      diagnosticsLog.entries.first.details,
-      contains('watering-hub-a1b2c3.local'),
-    );
+    expect(client.checkedHostname, hub.lastKnownHostname);
+    expect(preferences.getString('watering_hubs.active'), savedJson);
+    expect(stateStore.state.activeWateringHub?.toJson(),
+        isNot(contains('lastKnownIpAddress')));
   });
-
-  test('startup resolves mDNS host and uses resolved IP', () async {
-    final hub = _hubWithoutPlainToken();
-    SharedPreferences.setMockInitialValues({
-      'watering_hubs.active': jsonEncode(hub.toJson()),
-    });
-    final preferences = await SharedPreferences.getInstance();
-    final stateStore = AppStateStore();
-    final tokenStorage = InMemoryWateringHubTokenStorage()
-      ..tokens['hub-aa-bb-cc'] = validToken;
-    final diagnosticsLog = InMemoryDiagnosticsLog();
-    final client = RecordingStartupApiClient();
-    final startup = AppStartupService(
-      stateStore: stateStore,
-      wateringHubStorage: SharedPreferencesWateringHubStorage(preferences),
-      tokenStorage: tokenStorage,
-      controllerSettingsRepository: ControllerSettingsRepository(
-        apiClient: client,
-      ),
-      mdnsControllerResolver: const FakeMdnsControllerResolver(
-        resolvedIpAddress: '192.168.1.77',
-      ),
-      diagnosticsLog: diagnosticsLog,
-    );
-
-    await startup.initialize();
-
-    expect(stateStore.state.startupStatus, AppStartupStatus.ready);
-    expect(
-        stateStore.state.activeWateringHub?.lastKnownIpAddress, '192.168.1.77');
-    expect(client.checkedIpAddress, '192.168.1.77');
-    final savedHub = await SharedPreferencesWateringHubStorage(preferences)
-        .readActiveWateringHub();
-    expect(savedHub?.lastKnownIpAddress, '192.168.1.77');
-  });
-}
-
-class FakeMdnsControllerResolver implements MdnsControllerResolver {
-  const FakeMdnsControllerResolver({this.resolvedIpAddress});
-
-  final String? resolvedIpAddress;
-
-  @override
-  Future<String?> resolve({
-    required String hostname,
-    required String localHostname,
-  }) async {
-    return resolvedIpAddress;
-  }
 }
 
 const validToken =
@@ -239,7 +171,6 @@ WateringHub _hubWithoutPlainToken() {
     id: 'hub-aa-bb-cc',
     displayName: 'Automatic Watering Hub',
     bleDeviceId: 'AA:BB:CC',
-    lastKnownIpAddress: '192.168.1.42',
     lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: null,
     serverDeviceId: null,
@@ -254,21 +185,21 @@ class RecordingStartupApiClient implements LocalControllerApiClient {
 
   final LocalControllerApiException? getException;
   int getCalls = 0;
-  String? checkedIpAddress;
+  String? checkedHostname;
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     getCalls += 1;
-    checkedIpAddress = ipAddress;
+    checkedHostname = hostname;
     final getException = this.getException;
     if (getException != null) {
       throw getException;
@@ -306,14 +237,14 @@ class RecordingStartupApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {}
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     return const [];
@@ -321,13 +252,13 @@ class RecordingStartupApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -335,7 +266,7 @@ class RecordingStartupApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

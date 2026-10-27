@@ -72,7 +72,7 @@ void main() {
 
     await repository.saveSettings(_hub().readyAccess!, settings);
 
-    expect(client.putIpAddress, '192.168.1.42');
+    expect(client.putHostname, 'watering-hub-a1b2c3.local');
     expect(client.putApiAccessToken, 'token');
     expect(client.savedSettings?.toJson(), settings.toJson());
   });
@@ -219,7 +219,6 @@ WateringHub _hub() {
     id: 'hub-aa-bb-cc',
     displayName: 'Automatic Watering Hub',
     bleDeviceId: 'AA:BB:CC',
-    lastKnownIpAddress: '192.168.1.42',
     lastKnownHostname: 'watering-hub-a1b2c3.local',
     apiAccessToken: 'token',
     serverDeviceId: null,
@@ -235,19 +234,19 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
   final LocalControllerApiException? putException;
   int putCalls = 0;
   int getCalls = 0;
-  String? putIpAddress;
+  String? putHostname;
   String? putApiAccessToken;
   ControllerSettings? savedSettings;
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     getCalls += 1;
@@ -256,12 +255,12 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) async {
     putCalls += 1;
-    putIpAddress = ipAddress;
+    putHostname = hostname;
     putApiAccessToken = apiAccessToken;
     savedSettings = settings;
     final exception = putException;
@@ -272,7 +271,7 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
     return const [];
@@ -280,13 +279,13 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {}
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
@@ -294,7 +293,7 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) async {

@@ -9,6 +9,7 @@ import '../controller_settings/controller_settings.dart';
 import '../controller_settings/settings_response_data.dart';
 import '../diagnostics/diagnostics_log.dart';
 import '../sensors/sensor_metric.dart';
+import 'controller_address_service.dart';
 import 'modbus_address_change_models.dart';
 
 class LocalControllerApiException implements Exception {
@@ -18,42 +19,46 @@ class LocalControllerApiException implements Exception {
   String toString() => 'LocalControllerApiException';
 }
 
+class LocalControllerConnectionException extends LocalControllerApiException {
+  const LocalControllerConnectionException();
+}
+
 abstract interface class LocalControllerApiClient {
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   });
 
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   });
 
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   });
 
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   });
 
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
   });
 
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   });
 
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   });
@@ -68,8 +73,10 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
   HttpLocalControllerApiClient({
     required HttpClient httpClient,
     required DiagnosticsLog diagnosticsLog,
+    required ControllerAddressService addressService,
     Duration timeout = const Duration(seconds: 8),
   })  : _httpClient = httpClient,
+        _addressService = addressService,
         _diagnosticsLog = diagnosticsLog,
         _timeout = timeout;
 
@@ -77,24 +84,25 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       'DE:B7:7B:DC:88:1B:09:EE:23:19:8D:72:06:FA:E6:AD:F9:E4:8A:F1:5B:1D:EE:BB:4F:58:7F:0E:2F:42:B3:AC';
 
   final HttpClient _httpClient;
+  final ControllerAddressService _addressService;
   final DiagnosticsLog _diagnosticsLog;
   final Duration _timeout;
 
   @override
   Future<void> checkSettingsAccess({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) async {
-    await getSettings(ipAddress: ipAddress, apiAccessToken: apiAccessToken);
+    await getSettings(hostname: hostname, apiAccessToken: apiAccessToken);
   }
 
   @override
   Future<SettingsResponseData> getSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) {
     return _send(
-      request: _ControllerRequest.get(ipAddress, '/api/settings'),
+      request: _ControllerRequest.get(hostname, '/api/settings'),
       apiAccessToken: apiAccessToken,
       parse: _handleSettingsResponse,
     );
@@ -102,12 +110,12 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> putSettings({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ControllerSettings settings,
   }) {
     return _send(
-      request: _ControllerRequest.put(ipAddress, '/api/settings'),
+      request: _ControllerRequest.put(hostname, '/api/settings'),
       apiAccessToken: apiAccessToken,
       body: settings.toJson(),
       parse: _handleEmptyResponse,
@@ -116,11 +124,11 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<List<ControllerSensorMetric>> getSensorMetrics({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) {
     return _send(
-      request: _ControllerRequest.get(ipAddress, '/api/sensors/metrics'),
+      request: _ControllerRequest.get(hostname, '/api/sensors/metrics'),
       apiAccessToken: apiAccessToken,
       parse: _handleSensorMetricsResponse,
     );
@@ -128,14 +136,14 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> openValveForTime({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required int pin,
     required int seconds,
   }) {
     return _send(
       request: _ControllerRequest.post(
-        ipAddress,
+        hostname,
         '/api/valves/open-for-time',
       ),
       apiAccessToken: apiAccessToken,
@@ -146,11 +154,11 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<void> closeAllValves({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
   }) {
     return _send(
-      request: _ControllerRequest.post(ipAddress, '/api/valves/close-all'),
+      request: _ControllerRequest.post(hostname, '/api/valves/close-all'),
       apiAccessToken: apiAccessToken,
       parse: _handleEmptyResponse,
     );
@@ -158,13 +166,13 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
 
   @override
   Future<ModbusAddressChangeResult> changeModbusAddress({
-    required String ipAddress,
+    required String hostname,
     required String apiAccessToken,
     required ModbusAddressChangeRequest request,
   }) {
     return _send(
       request: _ControllerRequest.post(
-        ipAddress,
+        hostname,
         '/api/modbus/device-address',
       ),
       apiAccessToken: apiAccessToken,
@@ -181,6 +189,36 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
   }
 
   Future<T> _send<T>({
+    required _ControllerRequest request,
+    required String apiAccessToken,
+    required _ResponseParser<T> parse,
+    Object? body,
+  }) async {
+    final ipAddress = await _addressService.resolve(hostname: request.host);
+    if (ipAddress == null) throw const LocalControllerConnectionException();
+    try {
+      return await _sendOnce(
+        request: request.withHost(ipAddress),
+        apiAccessToken: apiAccessToken,
+        parse: parse,
+        body: body,
+      );
+    } on LocalControllerConnectionException {
+      final refreshedIp = await _addressService.resolve(
+        hostname: request.host,
+        refresh: true,
+      );
+      if (refreshedIp == null) rethrow;
+      return _sendOnce(
+        request: request.withHost(refreshedIp),
+        apiAccessToken: apiAccessToken,
+        parse: parse,
+        body: body,
+      );
+    }
+  }
+
+  Future<T> _sendOnce<T>({
     required _ControllerRequest request,
     required String apiAccessToken,
     required _ResponseParser<T> parse,
@@ -215,6 +253,9 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
         error: error,
         message: error.runtimeType.toString(),
       );
+      if (error is SocketException || error is TimeoutException) {
+        throw const LocalControllerConnectionException();
+      }
       throw const LocalControllerApiException();
     }
   }
@@ -305,9 +346,22 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     HttpClientResponse response,
     _ControllerRequest request,
   ) async {
-    final body = await response.transform(utf8.decoder).join().timeout(
-          _timeout,
-        );
+    final String body;
+    try {
+      body = await response.transform(utf8.decoder).join().timeout(_timeout);
+    } catch (error) {
+      if (response.statusCode == HttpStatus.ok) rethrow;
+      // The controller already returned an HTTP error. An incomplete error
+      // body must not turn that rejection into an address-recovery attempt.
+      _recordRequestException(
+        request: request,
+        error: error,
+        statusCode: response.statusCode,
+        message:
+            'Unexpected controller status ${response.statusCode}; incomplete response body',
+      );
+      throw const LocalControllerApiException();
+    }
     if (response.statusCode == HttpStatus.ok) {
       return body;
     }
@@ -436,4 +490,7 @@ class _ControllerRequest {
   final String method;
   final String host;
   final String path;
+
+  _ControllerRequest withHost(String host) =>
+      _ControllerRequest(method: method, host: host, path: path);
 }

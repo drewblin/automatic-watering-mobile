@@ -81,7 +81,7 @@ class ModbusAddressChangeController extends ChangeNotifier {
 
     try {
       final result = await _apiClient.changeModbusAddress(
-        ipAddress: access.ipAddress,
+        hostname: access.hostname,
         apiAccessToken: access.apiAccessToken,
         request: request,
       );
