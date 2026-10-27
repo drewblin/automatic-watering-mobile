@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:automatic_watering_mobile/app/app_state.dart';
 import 'package:automatic_watering_mobile/app/app_state_store.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
@@ -14,6 +16,109 @@ import 'package:flutter_test/flutter_test.dart';
 import 'controller_settings_sync_test.dart';
 
 void main() {
+  test('close all valves tracks progress, credentials and duplicate taps',
+      () async {
+    final api = RecordingDashboardApiClient()
+      ..closeCompletion = Completer<void>();
+    final controller = dashboardControllerFor(api);
+
+    final pending = controller.closeAllValves();
+    expect(controller.isClosingAllValves, isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(api.closeAllCalls, 1);
+    expect(api.closeIpAddress, '192.168.1.42');
+    expect(api.closeApiAccessToken, 'token');
+    expect(await controller.closeAllValves(), isFalse);
+    expect(api.closeAllCalls, 1);
+
+    api.closeCompletion!.complete();
+    expect(await pending, isTrue);
+    expect(controller.isClosingAllValves, isFalse);
+    expect(
+        controller.closeAllValvesState.status, ManualValveCommandStatus.sent);
+    expect(controller.closeAllValvesState.message,
+        'Команду закриття всіх клапанів виконано');
+  });
+
+  test('close all failure restores controls and permits retry', () async {
+    final api = RecordingDashboardApiClient()
+      ..closeException = const LocalControllerApiException();
+    final controller = dashboardControllerFor(api);
+
+    expect(await controller.closeAllValves(), isFalse);
+    expect(controller.isClosingAllValves, isFalse);
+    expect(
+        controller.closeAllValvesState.status, ManualValveCommandStatus.failed);
+    expect(controller.closeAllValvesState.message,
+        'Не вдалося закрити клапани. Перевірте з’єднання з контролером і спробуйте ще раз');
+
+    api.closeException = null;
+    expect(await controller.closeAllValves(), isTrue);
+    expect(api.closeAllCalls, 2);
+  });
+
+  for (final openFails in [false, true]) {
+    test(
+        'close completes independently of pending opening (failure: $openFails)',
+        () async {
+      final api = RecordingDashboardApiClient()
+        ..openCompletion = Completer<void>()
+        ..closeCompletion = Completer<void>();
+      final controller = dashboardControllerFor(api);
+      final settings =
+          SettingsResponseData.fromJson(settingsResponseDataJson).settings;
+      Future<bool> open() => controller.openValveForTime(
+            valve: settings.valveSettings.single,
+            seconds: 30,
+            settings: settings,
+          );
+
+      final opening = open();
+      final closing = controller.closeAllValves();
+      expect(controller.isClosingAllValves, isTrue);
+      expect(api.openValveCalls, 1);
+      expect(api.closeAllCalls, 1);
+
+      api.closeCompletion!.complete();
+      expect(await closing, isTrue);
+      expect(
+          controller.manualValveState.status, ManualValveCommandStatus.sending);
+
+      if (openFails) {
+        api.openCompletion!.completeError(const LocalControllerApiException());
+      } else {
+        api.openCompletion!.complete();
+      }
+      expect(await opening, !openFails);
+      expect(
+          controller.closeAllValvesState.status, ManualValveCommandStatus.sent);
+    });
+  }
+
+  test('opening completes while close all request is pending', () async {
+    final api = RecordingDashboardApiClient()
+      ..closeCompletion = Completer<void>();
+    final controller = dashboardControllerFor(api);
+    final settings =
+        SettingsResponseData.fromJson(settingsResponseDataJson).settings;
+
+    final closing = controller.closeAllValves();
+    expect(
+        await controller.openValveForTime(
+          valve: settings.valveSettings.single,
+          seconds: 30,
+          settings: settings,
+        ),
+        isTrue);
+    expect(api.openValveCalls, 1);
+    expect(api.closeAllCalls, 1);
+    expect(controller.isClosingAllValves, isTrue);
+    expect(controller.manualValveState.status, ManualValveCommandStatus.sent);
+
+    api.closeCompletion!.complete();
+    expect(await closing, isTrue);
+  });
+
   test('dashboard refresh syncs settings before metrics and maps objects',
       () async {
     final stateStore = AppStateStore();
@@ -152,6 +257,25 @@ WateringHub _hub() {
   );
 }
 
+HomeDashboardController dashboardControllerFor(
+    RecordingDashboardApiClient api) {
+  final hub = _hub();
+  final settings = SettingsResponseData.fromJson(settingsResponseDataJson);
+  final stateStore = AppStateStore()
+    ..setState(AppState.readyWithHub(
+      activeWateringHub: hub,
+      activePlanSchema: null,
+      settings: settings,
+      deviceObjects: buildDeviceObjects(
+          wateringHubId: hub.id, settings: settings.settings),
+    ));
+  return HomeDashboardController(
+    stateStore: stateStore,
+    settingsRepository: ControllerSettingsRepository(apiClient: api),
+    apiClient: api,
+  );
+}
+
 class RecordingDashboardApiClient implements LocalControllerApiClient {
   RecordingDashboardApiClient({this.metricsException});
 
@@ -160,6 +284,24 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
   var openValveCalls = 0;
   int? openValvePin;
   int? openValveSeconds;
+  Completer<void>? closeCompletion;
+  Completer<void>? openCompletion;
+  LocalControllerApiException? closeException;
+  int closeAllCalls = 0;
+  String? closeIpAddress;
+  String? closeApiAccessToken;
+
+  @override
+  Future<void> closeAllValves({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {
+    closeAllCalls++;
+    closeIpAddress = ipAddress;
+    closeApiAccessToken = apiAccessToken;
+    if (closeException case final error?) throw error;
+    await closeCompletion?.future;
+  }
 
   @override
   Future<void> checkSettingsAccess({
@@ -232,6 +374,7 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
     openValveCalls += 1;
     openValvePin = pin;
     openValveSeconds = seconds;
+    await openCompletion?.future;
   }
 
   @override

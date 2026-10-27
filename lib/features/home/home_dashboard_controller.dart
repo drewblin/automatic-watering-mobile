@@ -55,12 +55,17 @@ class HomeDashboardController extends ChangeNotifier {
   DashboardRefreshStatus _refreshStatus = DashboardRefreshStatus.idle;
   ManualValveCommandState _manualValveState =
       const ManualValveCommandState.idle();
+  ManualValveCommandState _closeAllValvesState =
+      const ManualValveCommandState.idle();
   List<SensorMetric> _metrics = const [];
   DateTime? _lastMetricsSyncedAt;
   String? _refreshErrorMessage;
 
   DashboardRefreshStatus get refreshStatus => _refreshStatus;
   ManualValveCommandState get manualValveState => _manualValveState;
+  ManualValveCommandState get closeAllValvesState => _closeAllValvesState;
+  bool get isClosingAllValves =>
+      _closeAllValvesState.status == ManualValveCommandStatus.sending;
   List<SensorMetric> get metrics => List.unmodifiable(_metrics);
   DateTime? get lastMetricsSyncedAt => _lastMetricsSyncedAt;
   String? get refreshErrorMessage => _refreshErrorMessage;
@@ -161,6 +166,34 @@ class HomeDashboardController extends ChangeNotifier {
     }
   }
 
+  Future<bool> closeAllValves() async {
+    if (isClosingAllValves) {
+      return false;
+    }
+    final access = _stateStore.state.readyWateringHubAccess;
+    _setCloseAllValvesState(const ManualValveCommandState(
+      status: ManualValveCommandStatus.sending,
+    ));
+    try {
+      await _apiClient.closeAllValves(
+        ipAddress: access.ipAddress,
+        apiAccessToken: access.apiAccessToken,
+      );
+      _setCloseAllValvesState(const ManualValveCommandState(
+        status: ManualValveCommandStatus.sent,
+        message: 'Команду закриття всіх клапанів виконано',
+      ));
+      return true;
+    } on LocalControllerApiException {
+      _setCloseAllValvesState(const ManualValveCommandState(
+        status: ManualValveCommandStatus.failed,
+        message:
+            'Не вдалося закрити клапани. Перевірте з’єднання з контролером і спробуйте ще раз',
+      ));
+      return false;
+    }
+  }
+
   void resetManualValveState() {
     _setManualValveState(const ManualValveCommandState.idle());
   }
@@ -213,6 +246,11 @@ class HomeDashboardController extends ChangeNotifier {
 
   void _setManualValveState(ManualValveCommandState state) {
     _manualValveState = state;
+    notifyListeners();
+  }
+
+  void _setCloseAllValvesState(ManualValveCommandState state) {
+    _closeAllValvesState = state;
     notifyListeners();
   }
 }

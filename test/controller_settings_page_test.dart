@@ -279,6 +279,12 @@ class RecordingSettingsApiClient implements LocalControllerApiClient {
   }
 
   @override
+  Future<void> closeAllValves({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) async {}
+
+  @override
   Future<void> openValveForTime({
     required String ipAddress,
     required String apiAccessToken,

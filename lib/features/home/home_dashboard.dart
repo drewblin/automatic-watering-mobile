@@ -107,6 +107,34 @@ class _DashboardBody extends StatelessWidget {
               onRefresh: controller.isRefreshing ? null : controller.refresh,
             ),
             const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: controller.isClosingAllValves
+                    ? null
+                    : () => _closeAllValves(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(color: Theme.of(context).colorScheme.error),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                icon: controller.isClosingAllValves
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.stop_circle_outlined),
+                label: Text(controller.isClosingAllValves
+                    ? 'Закриваємо клапани…'
+                    : 'Закрити всі клапани'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Автоматичний полив може знову відкрити клапани',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
             HomeSection(
               title: 'Клапани',
               emptyText: 'Клапани не налаштовані.',
@@ -222,6 +250,19 @@ class _DashboardBody extends StatelessWidget {
     }
     if (success) {
       controller.resetManualValveState();
+    }
+  }
+
+  Future<void> _closeAllValves(BuildContext context) async {
+    await controller.closeAllValves();
+    if (!context.mounted) {
+      return;
+    }
+    final message = controller.closeAllValvesState.message;
+    if (message != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
     }
   }
 }

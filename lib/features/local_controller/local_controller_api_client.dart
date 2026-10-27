@@ -47,6 +47,11 @@ abstract interface class LocalControllerApiClient {
     required int seconds,
   });
 
+  Future<void> closeAllValves({
+    required String ipAddress,
+    required String apiAccessToken,
+  });
+
   Future<ModbusAddressChangeResult> changeModbusAddress({
     required String ipAddress,
     required String apiAccessToken,
@@ -135,6 +140,18 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       ),
       apiAccessToken: apiAccessToken,
       body: {'pin': pin, 'seconds': seconds},
+      parse: _handleEmptyResponse,
+    );
+  }
+
+  @override
+  Future<void> closeAllValves({
+    required String ipAddress,
+    required String apiAccessToken,
+  }) {
+    return _send(
+      request: _ControllerRequest.post(ipAddress, '/api/valves/close-all'),
+      apiAccessToken: apiAccessToken,
       parse: _handleEmptyResponse,
     );
   }

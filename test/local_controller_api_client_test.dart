@@ -9,6 +9,55 @@ import 'package:automatic_watering_mobile/features/local_controller/local_contro
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
 
 void main() {
+  test('close all valves posts authenticated request without a body', () async {
+    final httpClient = _FakeHttpClient(responseBody: {
+      'success': true,
+      'data': <String, Object?>{},
+      'error': null,
+    });
+    final client = HttpLocalControllerApiClient(
+      httpClient: httpClient,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+    );
+
+    await client.closeAllValves(
+      ipAddress: '192.168.1.42',
+      apiAccessToken: 'secret-token',
+    );
+
+    expect(httpClient.lastMethod, 'POST');
+    expect(httpClient.lastUri.toString(),
+        'https://192.168.1.42/api/valves/close-all');
+    expect(httpClient.lastAuthorization, 'Bearer secret-token');
+    expect(httpClient.lastRequestBody, isNull);
+  });
+
+  for (final status in [
+    HttpStatus.ok,
+    HttpStatus.unauthorized,
+    HttpStatus.serviceUnavailable
+  ]) {
+    test('close all valves rejects failure with HTTP $status', () async {
+      final client = HttpLocalControllerApiClient(
+        httpClient: _FakeHttpClient(
+          statusCode: status,
+          responseBody: {
+            'success': false,
+            'data': <String, Object?>{},
+            'error': 'Command rejected',
+          },
+        ),
+        diagnosticsLog: InMemoryDiagnosticsLog(),
+      );
+
+      await expectLater(
+        client.closeAllValves(
+            ipAddress: '192.168.1.42', apiAccessToken: 'token'),
+        throwsA(isA<LocalControllerApiException>()),
+      );
+    });
+  }
+
   test('settings success false logs controller error before parsing data',
       () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();
@@ -193,11 +242,16 @@ void main() {
 }
 
 class _FakeHttpClient implements HttpClient {
-  _FakeHttpClient({required Map<String, Object?> responseBody})
+  _FakeHttpClient(
+      {required Map<String, Object?> responseBody,
+      this.statusCode = HttpStatus.ok})
       : _responseBody = responseBody;
 
   final Map<String, Object?> _responseBody;
   Uri? lastUri;
+  final int statusCode;
+  String? lastMethod;
+  Object? lastAuthorization;
   Map<String, Object?>? lastRequestBody;
 
   @override
@@ -208,6 +262,7 @@ class _FakeHttpClient implements HttpClient {
 
   @override
   Future<HttpClientRequest> postUrl(Uri url) async {
+    lastMethod = 'POST';
     lastUri = url;
     return _FakeHttpClientRequest(_responseBody, this);
   }
@@ -246,11 +301,13 @@ class _FakeHttpClientRequest implements HttpClientRequest {
 
   @override
   Future<HttpClientResponse> close() async {
+    _client.lastAuthorization =
+        _headers._values[HttpHeaders.authorizationHeader];
     if (_body.isNotEmpty) {
       _client.lastRequestBody =
           jsonDecode(utf8.decode(_body)) as Map<String, Object?>;
     }
-    return _FakeHttpClientResponse(_responseBody);
+    return _FakeHttpClientResponse(_responseBody, _client.statusCode);
   }
 
   @override
@@ -259,13 +316,13 @@ class _FakeHttpClientRequest implements HttpClientRequest {
 
 class _FakeHttpClientResponse extends Stream<List<int>>
     implements HttpClientResponse {
-  _FakeHttpClientResponse(Map<String, Object?> body)
+  _FakeHttpClientResponse(Map<String, Object?> body, this.statusCode)
       : _body = utf8.encode(jsonEncode(body));
 
   final List<int> _body;
 
   @override
-  int get statusCode => HttpStatus.ok;
+  final int statusCode;
 
   @override
   StreamSubscription<List<int>> listen(
