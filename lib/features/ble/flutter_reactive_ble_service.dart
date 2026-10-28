@@ -242,8 +242,6 @@ class FlutterReactiveBleService implements BleService {
       payload: credentials.toBleJson(),
       parseData: SaveWifiSettingsResponse.fromJson,
       failureMessage: 'Wi-Fi settings save failed',
-      fallbackOnReadFailure:
-          const SaveWifiSettingsResponse(restartScheduled: true),
     );
   }
 
@@ -333,7 +331,6 @@ class FlutterReactiveBleService implements BleService {
     required Map<String, Object?> payload,
     required T Function(Object? data) parseData,
     required String failureMessage,
-    T? fallbackOnReadFailure,
   }) async {
     _ensureConnected(deviceId);
     final characteristic =
@@ -343,16 +340,8 @@ class FlutterReactiveBleService implements BleService {
       value: utf8.encode(jsonEncode(payload)),
     );
 
-    try {
-      final responseValue = await _ble.readCharacteristic(characteristic);
-      return _parseEnvelopeData(responseValue, parseData, failureMessage);
-    } catch (_) {
-      final fallback = fallbackOnReadFailure;
-      if (fallback != null) {
-        return fallback;
-      }
-      rethrow;
-    }
+    final responseValue = await _ble.readCharacteristic(characteristic);
+    return _parseEnvelopeData(responseValue, parseData, failureMessage);
   }
 
   T _parseEnvelopeData<T>(

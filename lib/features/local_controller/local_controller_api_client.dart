@@ -125,7 +125,7 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       request: _ControllerRequest.put(hostname, '/api/settings'),
       apiAccessToken: apiAccessToken,
       body: settings.toJson(),
-      parse: _handleEmptyResponse,
+      parse: _handleSettingsSaveResponse,
     );
   }
 
@@ -303,6 +303,25 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
           throw const FormatException('Settings data must be an object');
         }
         return SettingsResponseData.fromJson(data);
+      },
+    );
+  }
+
+  Future<void> _handleSettingsSaveResponse(
+    HttpClientResponse response,
+    _ControllerRequest request,
+  ) async {
+    final body = await _ensureOkBody(response, request);
+    _parseEnvelope<Object?>(
+      body: body,
+      statusCode: response.statusCode,
+      request: request,
+      label: 'Settings save',
+      parseData: (data) {
+        if (data is! Map<String, Object?> || data['restartScheduled'] != true) {
+          throw const FormatException('Settings save did not confirm restart');
+        }
+        return null;
       },
     );
   }

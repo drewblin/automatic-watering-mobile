@@ -45,6 +45,7 @@ class GlobalSettings {
     required this.wateringPressureSensorReadIntervalSeconds,
     required this.idleSoilSensorReadIntervalSeconds,
     required this.wateringSoilSensorReadIntervalSeconds,
+    required this.modbusWarmupMs,
     required this.maximumManualValveOpenTimeSeconds,
     required this.startWateringBelowHumidityPercent,
     required this.stopWateringAboveHumidityPercent,
@@ -61,6 +62,7 @@ class GlobalSettings {
   final int wateringPressureSensorReadIntervalSeconds;
   final int idleSoilSensorReadIntervalSeconds;
   final int wateringSoilSensorReadIntervalSeconds;
+  final int modbusWarmupMs;
   final int maximumManualValveOpenTimeSeconds;
   final int startWateringBelowHumidityPercent;
   final int stopWateringAboveHumidityPercent;
@@ -96,6 +98,7 @@ class GlobalSettings {
         json['wateringSoilSensorReadIntervalSeconds'],
         'wateringSoilSensorReadIntervalSeconds',
       ),
+      modbusWarmupMs: readInt(json['modbusWarmupMs'], 'modbusWarmupMs'),
       maximumManualValveOpenTimeSeconds: readInt(
         json['maximumManualValveOpenTimeSeconds'],
         'maximumManualValveOpenTimeSeconds',
@@ -147,6 +150,7 @@ class GlobalSettings {
       'idleSoilSensorReadIntervalSeconds': idleSoilSensorReadIntervalSeconds,
       'wateringSoilSensorReadIntervalSeconds':
           wateringSoilSensorReadIntervalSeconds,
+      'modbusWarmupMs': modbusWarmupMs,
       'maximumManualValveOpenTimeSeconds': maximumManualValveOpenTimeSeconds,
       'startWateringBelowHumidityPercent': startWateringBelowHumidityPercent,
       'stopWateringAboveHumidityPercent': stopWateringAboveHumidityPercent,

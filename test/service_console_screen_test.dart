@@ -106,7 +106,7 @@ void main() {
         findsOneWidget);
   });
 
-  testWidgets('read form sends numeric input without range validation',
+  testWidgets('read form blocks out-of-range requests and explains the error',
       (tester) async {
     final apiClient = FakeLocalControllerApiClient()
       ..readException = const LocalControllerApiException();
@@ -123,9 +123,8 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
     await tester.pumpAndSettle();
 
-    expect(apiClient.readRequests.single.toJson(),
-        {'slaveAddress': -1, 'registerAddress': 65535, 'quantity': 65});
-    expect(find.text('Не вдалося прочитати регістри.'), findsOneWidget);
+    expect(apiClient.readRequests, isEmpty);
+    expect(find.text('Адреса пристрою має бути від 0 до 255.'), findsOneWidget);
   });
 
   testWidgets('read form disables controls until the request completes',

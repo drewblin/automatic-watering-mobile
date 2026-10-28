@@ -3,6 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:automatic_watering_mobile/app/app_state.dart';
+import 'package:automatic_watering_mobile/app/app_state_store.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_repository.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/controller_settings_save_controller.dart';
+import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
+import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:automatic_watering_mobile/features/local_controller/controller_address_service.dart';
 import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
 
@@ -11,7 +18,113 @@ import 'package:automatic_watering_mobile/features/local_controller/local_contro
 import 'package:automatic_watering_mobile/features/local_controller/modbus_register_write_models.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 
+import 'controller_settings_sync_test.dart'
+    show settingsResponseDataJson, settingsJson;
+
 void main() {
+  for (final data in <Object?>[
+    {'restartScheduled': false},
+    {},
+    null,
+    {'restartScheduled': 'true'},
+    {'restartScheduled': 1},
+  ]) {
+    test('settings save does not enter reboot without confirmation: $data',
+        () async {
+      final diagnostics = InMemoryDiagnosticsLog();
+      final client = HttpLocalControllerApiClient(
+        addressService:
+            ControllerAddressService(mdnsControllerResolver: _Resolver()),
+        httpClient: _FakeHttpClient(responseBody: {
+          'success': true,
+          'data': data,
+          'error': null,
+        }),
+        diagnosticsLog: diagnostics,
+      );
+      final settings = SettingsResponseData.fromJson(settingsResponseDataJson);
+      final now = DateTime.utc(2026);
+      final stateStore = AppStateStore()
+        ..setState(AppState.readyWithHub(
+          activeWateringHub: WateringHub(
+            id: 'hub',
+            displayName: 'Контролер',
+            bleDeviceId: 'hub',
+            lastKnownHostname: 'watering-hub.local',
+            apiAccessToken: 'token',
+            serverDeviceId: null,
+            onboardingCompletedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+          activePlanSchema: null,
+          settings: settings,
+          deviceObjects: const [],
+        ));
+      final controller = ControllerSettingsSaveController(
+        stateStore: stateStore,
+        repository: ControllerSettingsRepository(apiClient: client),
+        rebootDelay: Duration.zero,
+        reconnectTimeout: Duration.zero,
+      );
+      addTearDown(controller.dispose);
+      addTearDown(stateStore.dispose);
+      final statuses = <ControllerSettingsSaveFlowStatus>[];
+      final subscription =
+          controller.states.listen((state) => statuses.add(state.status));
+      addTearDown(subscription.cancel);
+
+      expect(await controller.save(settings.settings), isFalse);
+      expect(statuses, [
+        ControllerSettingsSaveFlowStatus.saving,
+        ControllerSettingsSaveFlowStatus.saveFailed,
+      ]);
+      expect(stateStore.state.settings, same(settings));
+      expect(diagnostics.entries, hasLength(1));
+    });
+  }
+
+  test('settings PUT preserves warmup and accepts confirmed restart', () async {
+    final transport = _FakeHttpClient(responseBody: {
+      'success': true,
+      'data': {'restartScheduled': true},
+      'error': null,
+    });
+    final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
+      httpClient: transport,
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+    );
+    final settings = ControllerSettings.fromJson({
+      ...settingsJson,
+      'globalSettings': {
+        ...settingsJson['globalSettings']! as Map<String, Object?>,
+        'modbusWarmupMs': 2000,
+      },
+    });
+
+    await client.putSettings(
+        hostname: 'watering-hub.local',
+        apiAccessToken: 'token',
+        settings: settings);
+
+    expect(transport.lastUri?.path, '/api/settings');
+    expect(transport.lastRequestBody?['globalSettings'],
+        containsPair('modbusWarmupMs', 2000));
+    expect(
+        transport.lastRequestBody?.keys,
+        unorderedEquals([
+          'globalSettings',
+          'remoteLogSettings',
+          'valveSettings',
+          'pressureSensor',
+          'magistralWaterCounterSetting',
+          'leafWaterCounterSettings',
+          'soilSensorSettings',
+        ]));
+  });
+
   test('read Modbus registers posts authenticated body and parses values',
       () async {
     final diagnosticsLog = InMemoryDiagnosticsLog();

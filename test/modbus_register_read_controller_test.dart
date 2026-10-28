@@ -37,12 +37,38 @@ void main() {
     (slave: '1', register: '65536', quantity: '1'),
     (slave: '1', register: '0', quantity: '0'),
     (slave: '1', register: '0', quantity: '65'),
-    (slave: '1', register: '65535', quantity: '2'),
+    (slave: '', register: '0', quantity: '1'),
+    (slave: 'abc', register: '0', quantity: '1'),
+    (slave: '1.5', register: '0', quantity: '1'),
+    (slave: '1', register: '', quantity: '1'),
+    (slave: '1', register: 'abc', quantity: '1'),
+    (slave: '1', register: '1.5', quantity: '1'),
+    (slave: '1', register: '0', quantity: ''),
+    (slave: '1', register: '0', quantity: 'abc'),
+    (slave: '1', register: '0', quantity: '1.5'),
   ]) {
-    test('forwards numeric read input $input for controller validation',
+    test('blocks invalid read request $input before calling the controller',
         () async {
-      apiClient.readResult = _result();
+      expect(
+          await controller.submit(
+            slaveAddressText: input.slave,
+            registerAddressText: input.register,
+            quantityText: input.quantity,
+          ),
+          isFalse);
+      expect(apiClient.readRequests, isEmpty);
+      expect(controller.state.status, ModbusRegisterReadStatus.failure);
+      expect(controller.state.message, isNotEmpty);
+      expect(controller.state.result, isNull);
+    });
+  }
 
+  for (final input in [
+    (slave: '0', register: '0', quantity: '1'),
+    (slave: '255', register: '65535', quantity: '64'),
+    (slave: ' 1 ', register: ' 65535 ', quantity: ' 2 '),
+  ]) {
+    test('accepts read request field boundaries $input', () async {
       expect(
           await controller.submit(
             slaveAddressText: input.slave,
@@ -51,13 +77,36 @@ void main() {
           ),
           isTrue);
       expect(apiClient.readRequests.single.toJson(), {
-        'slaveAddress': int.parse(input.slave),
-        'registerAddress': int.parse(input.register),
-        'quantity': int.parse(input.quantity),
+        'slaveAddress': int.parse(input.slave.trim()),
+        'registerAddress': int.parse(input.register.trim()),
+        'quantity': int.parse(input.quantity.trim()),
       });
       expect(controller.state.status, ModbusRegisterReadStatus.success);
     });
   }
+
+  test(
+      'invalid read clears the previous result and permits a corrected request',
+      () async {
+    expect(await _submit(controller), isTrue);
+    expect(controller.state.result, isNotNull);
+
+    expect(
+        await controller.submit(
+          slaveAddressText: '1',
+          registerAddressText: '0',
+          quantityText: '65',
+        ),
+        isFalse);
+    expect(apiClient.readRequests, hasLength(1));
+    expect(controller.state.result, isNull);
+    expect(
+        controller.state.message, 'Кількість регістрів має бути від 1 до 64.');
+
+    expect(await _submit(controller), isTrue);
+    expect(apiClient.readRequests, hasLength(2));
+    expect(controller.state.message, isNull);
+  });
 
   test('reads with active hub access and exposes returned addresses and values',
       () async {

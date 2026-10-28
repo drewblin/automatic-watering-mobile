@@ -84,7 +84,9 @@ void main() {
                     'registerAddress': 256,
                     'value': 2
                   }
-                : const {'sensors': []});
+                : command == 'settings'
+                    ? const {'restartScheduled': true}
+                    : const {'sensors': []});
       };
       switch (command) {
         case 'openValve':

@@ -380,6 +380,7 @@ const settingsResponseDataJson = {
       'wateringPressureSensorReadIntervalSeconds': 10,
       'idleSoilSensorReadIntervalSeconds': 300,
       'wateringSoilSensorReadIntervalSeconds': 30,
+      'modbusWarmupMs': 0,
       'maximumManualValveOpenTimeSeconds': 600,
       'startWateringBelowHumidityPercent': 35,
       'stopWateringAboveHumidityPercent': 60,

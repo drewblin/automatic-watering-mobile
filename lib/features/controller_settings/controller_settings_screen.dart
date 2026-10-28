@@ -204,6 +204,15 @@ class _ControllerSettingsScreenState extends State<ControllerSettingsScreen> {
                 title: 'Загальні налаштування',
                 children: [
                   _NumberField(
+                    scrollKey: _keyFor('global.modbusWarmupMs'),
+                    enabled: !_busy,
+                    label: 'Час прогріву Modbus-датчиків, мс',
+                    value: _draft.globalSettings.modbusWarmupMs,
+                    error: _validation['global.modbusWarmupMs'],
+                    onChanged: (value) => _changed(
+                        () => _draft.globalSettings.modbusWarmupMs = value),
+                  ),
+                  _NumberField(
                     scrollKey:
                         _keyFor('global.maximumManualValveOpenTimeSeconds'),
                     enabled: !_busy,

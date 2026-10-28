@@ -181,6 +181,7 @@ class GlobalSettingsDraft {
     required this.wateringPressureSensorReadIntervalSeconds,
     required this.idleSoilSensorReadIntervalSeconds,
     required this.wateringSoilSensorReadIntervalSeconds,
+    required this.modbusWarmupMs,
     required this.maximumManualValveOpenTimeSeconds,
     required this.startWateringBelowHumidityPercent,
     required this.stopWateringAboveHumidityPercent,
@@ -207,6 +208,7 @@ class GlobalSettingsDraft {
           settings.idleSoilSensorReadIntervalSeconds.toString(),
       wateringSoilSensorReadIntervalSeconds:
           settings.wateringSoilSensorReadIntervalSeconds.toString(),
+      modbusWarmupMs: settings.modbusWarmupMs.toString(),
       maximumManualValveOpenTimeSeconds:
           settings.maximumManualValveOpenTimeSeconds.toString(),
       startWateringBelowHumidityPercent:
@@ -234,6 +236,7 @@ class GlobalSettingsDraft {
   String wateringPressureSensorReadIntervalSeconds;
   String idleSoilSensorReadIntervalSeconds;
   String wateringSoilSensorReadIntervalSeconds;
+  String modbusWarmupMs;
   String maximumManualValveOpenTimeSeconds;
   String startWateringBelowHumidityPercent;
   String stopWateringAboveHumidityPercent;
@@ -259,6 +262,7 @@ class GlobalSettingsDraft {
           int.parse(idleSoilSensorReadIntervalSeconds),
       wateringSoilSensorReadIntervalSeconds:
           int.parse(wateringSoilSensorReadIntervalSeconds),
+      modbusWarmupMs: int.parse(modbusWarmupMs),
       maximumManualValveOpenTimeSeconds:
           int.parse(maximumManualValveOpenTimeSeconds),
       startWateringBelowHumidityPercent:
@@ -286,6 +290,14 @@ class GlobalSettingsDraft {
   }
 
   void addErrors(Map<String, String> errors) {
+    _readIntRange(
+      modbusWarmupMs,
+      'global.modbusWarmupMs',
+      0,
+      60000,
+      'Значення має бути від 0 до 60000 мс.',
+      errors,
+    );
     _readInterval(
       idleWaterCounterReadIntervalSeconds,
       'global.idleWaterCounterReadIntervalSeconds',

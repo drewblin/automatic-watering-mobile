@@ -57,6 +57,21 @@ class ModbusRegisterReadController extends ChangeNotifier {
       return false;
     }
 
+    final slaveAddress = int.tryParse(slaveAddressText.trim());
+    if (slaveAddress == null || slaveAddress < 0 || slaveAddress > 255) {
+      return _rejectRequest('Адреса пристрою має бути від 0 до 255.');
+    }
+    final registerAddress = int.tryParse(registerAddressText.trim());
+    if (registerAddress == null ||
+        registerAddress < 0 ||
+        registerAddress > 65535) {
+      return _rejectRequest('Адреса регістра має бути від 0 до 65535.');
+    }
+    final quantity = int.tryParse(quantityText.trim());
+    if (quantity == null || quantity < 1 || quantity > 64) {
+      return _rejectRequest('Кількість регістрів має бути від 1 до 64.');
+    }
+
     _setState(const ModbusRegisterReadState(
       status: ModbusRegisterReadStatus.submitting,
       message: null,
@@ -67,9 +82,9 @@ class ModbusRegisterReadController extends ChangeNotifier {
         hostname: access.hostname,
         apiAccessToken: access.apiAccessToken,
         request: ModbusRegisterReadRequest(
-          slaveAddress: int.parse(slaveAddressText.trim()),
-          registerAddress: int.parse(registerAddressText.trim()),
-          quantity: int.parse(quantityText.trim()),
+          slaveAddress: slaveAddress,
+          registerAddress: registerAddress,
+          quantity: quantity,
         ),
       );
       if (_disposed) return false;
@@ -86,6 +101,15 @@ class ModbusRegisterReadController extends ChangeNotifier {
         result: null,
       ));
     }
+    return false;
+  }
+
+  bool _rejectRequest(String message) {
+    _setState(ModbusRegisterReadState(
+      status: ModbusRegisterReadStatus.failure,
+      message: message,
+      result: null,
+    ));
     return false;
   }
 

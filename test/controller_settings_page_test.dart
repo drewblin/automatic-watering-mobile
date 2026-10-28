@@ -19,6 +19,65 @@ import 'app_test_composition.dart';
 import 'controller_settings_sync_test.dart';
 
 void main() {
+  for (final warmup in [0, 2000, 60000]) {
+    test('preserves Modbus warmup $warmup through form edits', () {
+      final settings = ControllerSettings.fromJson({
+        ...settingsJson,
+        'globalSettings': {
+          ...settingsJson['globalSettings']! as Map<String, Object?>,
+          'modbusWarmupMs': warmup,
+        },
+      });
+      final draft = ControllerSettingsFormDraft.fromSettings(settings);
+      draft.valves.first.name = 'Нова назва';
+
+      expect(draft.buildSettings().toJson()['globalSettings'],
+          containsPair('modbusWarmupMs', warmup));
+    });
+  }
+
+  test('rejects settings without the required Modbus warmup', () {
+    final globalSettings = Map<String, Object?>.from(
+      settingsJson['globalSettings']! as Map<String, Object?>,
+    )..remove('modbusWarmupMs');
+
+    expect(
+      () => ControllerSettings.fromJson({
+        ...settingsJson,
+        'globalSettings': globalSettings,
+      }),
+      throwsFormatException,
+    );
+  });
+
+  testWidgets('edits Modbus warmup and validates millisecond boundaries',
+      (tester) async {
+    final composition = TestAppComposition();
+    addTearDown(composition.appController.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: ControllerSettingsScreen(
+        settings: SettingsResponseData.fromJson(settingsResponseDataJson),
+        deviceObjects: const [],
+        saveController: composition.appController.settingsSaveController,
+        serviceConsoleDependencies:
+            composition.appController.serviceConsoleDependencies,
+      ),
+    ));
+    final field =
+        find.widgetWithText(TextFormField, 'Час прогріву Modbus-датчиків, мс');
+    await tester.ensureVisible(field);
+    for (final value in ['-1', '60001', '1.5', '', 'abc']) {
+      await tester.enterText(field, value);
+      await tester.pump();
+      expect(find.text('Значення має бути від 0 до 60000 мс.'), findsOneWidget);
+    }
+    for (final value in ['0', '60000']) {
+      await tester.enterText(field, value);
+      await tester.pump();
+      expect(find.text('Значення має бути від 0 до 60000 мс.'), findsNothing);
+    }
+  });
+
   testWidgets('chooses GPIO pins for valves and both flow sensor types',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(900, 7000));
