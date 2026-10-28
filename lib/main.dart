@@ -76,9 +76,8 @@ Future<void> main() async {
         activeWateringHubListenable: activeWateringHubListenable,
       );
       final modbusRegisterWriteController = ModbusRegisterWriteController(
+        stateStore: stateStore,
         apiClient: localControllerApiClient,
-        activeControllerAccessProvider: () =>
-            stateStore.state.activeWateringHub?.readyAccess,
       );
       final settingsSaveController = ControllerSettingsSaveController(
         stateStore: stateStore,

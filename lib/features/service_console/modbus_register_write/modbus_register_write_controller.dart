@@ -1,10 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../app/app_state_store.dart';
 import '../../local_controller/local_controller_api_client.dart';
 import '../../local_controller/modbus_register_write_models.dart';
-import '../../watering_hubs/watering_hub.dart';
-
-typedef ActiveControllerAccessProvider = ReadyWateringHubAccess? Function();
 
 enum ModbusRegisterWriteStatus {
   idle,
@@ -33,13 +31,13 @@ class ModbusRegisterWriteState {
 
 class ModbusRegisterWriteController extends ChangeNotifier {
   ModbusRegisterWriteController({
+    required AppStateStore stateStore,
     required LocalControllerApiClient apiClient,
-    required ActiveControllerAccessProvider activeControllerAccessProvider,
-  })  : _apiClient = apiClient,
-        _activeControllerAccessProvider = activeControllerAccessProvider;
+  })  : _stateStore = stateStore,
+        _apiClient = apiClient;
 
+  final AppStateStore _stateStore;
   final LocalControllerApiClient _apiClient;
-  final ActiveControllerAccessProvider _activeControllerAccessProvider;
   ModbusRegisterWriteState _state = const ModbusRegisterWriteState.idle();
 
   ModbusRegisterWriteState get state => _state;
@@ -62,7 +60,7 @@ class ModbusRegisterWriteController extends ChangeNotifier {
       return false;
     }
 
-    final access = _activeControllerAccessProvider();
+    final access = _stateStore.state.activeWateringHub?.readyAccess;
     if (access == null) {
       _setState(const ModbusRegisterWriteState(
         status: ModbusRegisterWriteStatus.failure,

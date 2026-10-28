@@ -24,6 +24,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Modbus write uses current controller access from app state', () async {
+    final stateStore = AppStateStore();
+    final apiClient = FakeLocalControllerApiClient();
+    final controller = ModbusRegisterWriteController(
+      stateStore: stateStore,
+      apiClient: apiClient,
+    );
+    addTearDown(controller.dispose);
+    addTearDown(stateStore.dispose);
+
+    Future<bool> write() => controller.submit(
+          slaveAddressText: '11',
+          registerAddressText: '256',
+          valueText: '12',
+        );
+
+    expect(await write(), isFalse);
+    expect(apiClient.writtenRequest, isNull);
+
+    stateStore.setState(AppState.readyForOnboarding(
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
+    expect(await write(), isTrue);
+    expect(apiClient.writtenHostname, 'watering-hub-a1b2c3.local');
+    expect(apiClient.writtenApiAccessToken, 'token');
+
+    stateStore.setState(AppState.readyForOnboarding(
+      activeWateringHub: _hub(bleDeviceId: 'ble-42').copyWith(
+        lastKnownHostname: 'other-hub.local',
+        apiAccessToken: 'updated-token',
+      ),
+    ));
+    expect(await write(), isTrue);
+    expect(apiClient.writtenHostname, 'other-hub.local');
+    expect(apiClient.writtenApiAccessToken, 'updated-token');
+  });
+
   testWidgets('shows diagnostics empty state', (tester) async {
     await tester.pumpWidget(
       _TestApp(
@@ -590,9 +627,8 @@ class _TestApp extends StatelessWidget {
                     FakeActiveWateringHubListenable(null),
               ),
           modbusRegisterWriteController: ModbusRegisterWriteController(
+            stateStore: stateStore,
             apiClient: apiClient,
-            activeControllerAccessProvider: () =>
-                activeWateringHub?.readyAccess,
           ),
           modbusRegisterReadController: ModbusRegisterReadController(
             stateStore: stateStore,
@@ -761,6 +797,8 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   final LocalControllerApiException? exception;
   ModbusRegisterWriteRequest? writtenRequest;
+  String? writtenHostname;
+  String? writtenApiAccessToken;
   final readRequests = <ModbusRegisterReadRequest>[];
   ModbusRegisterReadResult? readResult;
   Future<ModbusRegisterReadResult>? readFuture;
@@ -844,6 +882,8 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
       throw exception;
     }
     writtenRequest = request;
+    writtenHostname = hostname;
+    writtenApiAccessToken = apiAccessToken;
     return ModbusRegisterWriteResult(
       status: 0,
       slaveAddress: request.slaveAddress,

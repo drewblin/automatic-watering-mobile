@@ -64,9 +64,8 @@ class TestAppComposition {
           autoReconnect: false,
         ),
         modbusRegisterWriteController: ModbusRegisterWriteController(
+          stateStore: stateStore,
           apiClient: apiClient,
-          activeControllerAccessProvider: () =>
-              stateStore.state.activeWateringHub?.readyAccess,
         ),
         modbusRegisterReadController: ModbusRegisterReadController(
           stateStore: stateStore,
