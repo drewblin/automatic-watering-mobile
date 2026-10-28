@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'modbus_address_change_controller.dart';
+import 'modbus_register_write_controller.dart';
 
 class ModbusRegisterWriteTab extends StatefulWidget {
   const ModbusRegisterWriteTab({

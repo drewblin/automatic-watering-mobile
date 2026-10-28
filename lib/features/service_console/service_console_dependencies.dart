@@ -1,6 +1,6 @@
 import '../diagnostics/diagnostics_log.dart';
 import 'ble_logs/ble_controller_logs_controller.dart';
-import 'modbus_address/modbus_address_change_controller.dart';
+import 'modbus_register_write/modbus_register_write_controller.dart';
 import 'modbus_register_read/modbus_register_read_controller.dart';
 
 class ServiceConsoleDependencies {

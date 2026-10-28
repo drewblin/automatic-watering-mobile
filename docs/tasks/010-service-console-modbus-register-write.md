@@ -1,4 +1,9 @@
-# Задача 010: Вкладка зміни Modbus адреси девайса
+# Задача 010: Запис Modbus
+
+Актуальна реалізація — вкладка **Запис Modbus** для запису довільного регістра:
+`ModbusRegisterWriteController`, `ModbusRegisterWriteTab`,
+`ModbusRegisterWriteRequest` і `ModbusRegisterWriteResult`.
+Нижче збережено початковий опис задачі зміни адреси як історичний контекст.
 
 ## Мета
 

@@ -10,12 +10,12 @@ import 'package:automatic_watering_mobile/features/controller_settings/controlle
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
-import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_write_models.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
-import 'package:automatic_watering_mobile/features/service_console/modbus_address/modbus_address_change_controller.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_register_write/modbus_register_write_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/modbus_register_read/modbus_register_read_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_screen.dart';
@@ -34,7 +34,7 @@ void main() {
 
     expect(find.text('Сервісна консоль'), findsOneWidget);
     expect(find.text('Діагностика'), findsOneWidget);
-    expect(find.text('Modbus регістр'), findsOneWidget);
+    expect(find.text('Запис Modbus'), findsOneWidget);
     expect(find.text('Читання Modbus'), findsOneWidget);
     expect(find.text('Діагностичних записів немає.'), findsOneWidget);
   });
@@ -99,8 +99,8 @@ void main() {
     expect(find.text('456'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.ensureVisible(find.text('Modbus регістр'));
-    await tester.tap(find.text('Modbus регістр'));
+    await tester.ensureVisible(find.text('Запис Modbus'));
+    await tester.tap(find.text('Запис Modbus'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, 'Записати в регістр'),
         findsOneWidget);
@@ -213,7 +213,7 @@ void main() {
       activeWateringHub: _hub(bleDeviceId: 'ble-42'),
     ));
 
-    await tester.tap(find.text('Modbus регістр'));
+    await tester.tap(find.text('Запис Modbus'));
     await tester.pumpAndSettle();
 
     expect(find.text('Адреса пристрою'), findsOneWidget);
@@ -626,7 +626,7 @@ Future<void> _fillRegisterWriteForm(
   required String register,
   required String value,
 }) async {
-  await tester.tap(find.text('Modbus регістр'));
+  await tester.tap(find.text('Запис Modbus'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField).at(0), slave);
   await tester.enterText(find.byType(TextField).at(1), register);

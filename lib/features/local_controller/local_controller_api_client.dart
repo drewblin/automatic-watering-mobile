@@ -10,7 +10,7 @@ import '../controller_settings/settings_response_data.dart';
 import '../diagnostics/diagnostics_log.dart';
 import '../sensors/sensor_metric.dart';
 import 'controller_address_service.dart';
-import 'modbus_address_change_models.dart';
+import 'modbus_register_write_models.dart';
 import 'modbus_register_read_models.dart';
 
 class LocalControllerApiException implements Exception {

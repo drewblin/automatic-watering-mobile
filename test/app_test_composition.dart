@@ -12,12 +12,12 @@ import 'package:automatic_watering_mobile/features/controller_settings/settings_
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
-import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_write_models.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
-import 'package:automatic_watering_mobile/features/service_console/modbus_address/modbus_address_change_controller.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_register_write/modbus_register_write_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/modbus_register_read/modbus_register_read_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/storage/in_memory_watering_hub_storage.dart';

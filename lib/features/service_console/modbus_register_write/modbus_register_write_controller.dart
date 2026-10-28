@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../local_controller/local_controller_api_client.dart';
-import '../../local_controller/modbus_address_change_models.dart';
+import '../../local_controller/modbus_register_write_models.dart';
 import '../../watering_hubs/watering_hub.dart';
 
 typedef ActiveControllerAccessProvider = ReadyWateringHubAccess? Function();

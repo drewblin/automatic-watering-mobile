@@ -22,7 +22,7 @@ import 'features/local_controller/mdns_controller_resolver.dart';
 import 'features/onboarding/ble_onboarding_controller.dart';
 import 'features/onboarding/phone_wifi_service.dart';
 import 'features/service_console/ble_logs/ble_controller_logs_controller.dart';
-import 'features/service_console/modbus_address/modbus_address_change_controller.dart';
+import 'features/service_console/modbus_register_write/modbus_register_write_controller.dart';
 import 'features/service_console/modbus_register_read/modbus_register_read_controller.dart';
 import 'features/service_console/service_console_dependencies.dart';
 import 'storage/local_watering_hub_storage.dart';

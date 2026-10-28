@@ -12,7 +12,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/settings_
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/local_controller/mdns_controller_resolver.dart';
-import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_write_models.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_controller.dart';
 import 'package:automatic_watering_mobile/features/onboarding/ble_onboarding_state.dart';

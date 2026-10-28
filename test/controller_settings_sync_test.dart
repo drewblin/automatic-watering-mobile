@@ -4,7 +4,7 @@ import 'app_test_composition.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/controller_settings.dart';
 import 'package:automatic_watering_mobile/features/controller_settings/settings_response_data.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
-import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_write_models.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
