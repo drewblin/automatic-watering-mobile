@@ -124,6 +124,83 @@ void main() {
     expect(find.text('GPIO pin вже використовується.'), findsNWidgets(2));
   });
 
+  for (final duplicateOnLoad in [false, true]) {
+    testWidgets(
+        'keeps valve sensor selection usable with duplicate addresses '
+        '(loaded: $duplicateOnLoad)', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(900, 7000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final composition = TestAppComposition();
+      addTearDown(composition.appController.dispose);
+      final settings = SettingsResponseData.fromJson({
+        ...settingsResponseDataJson,
+        'settings': {
+          ...settingsJson,
+          'pressureSensor': null,
+          'soilSensorSettings': [
+            {'slaveAddress': 11, 'name': 'Датчик А'},
+            {'slaveAddress': duplicateOnLoad ? 11 : 12, 'name': 'Датчик Б'},
+          ],
+        },
+      });
+      await tester.pumpWidget(MaterialApp(
+        home: ControllerSettingsScreen(
+          settings: settings,
+          deviceObjects: const [],
+          saveController: composition.appController.settingsSaveController,
+          serviceConsoleDependencies:
+              composition.appController.serviceConsoleDependencies,
+        ),
+      ));
+      expect(tester.takeException(), isNull);
+
+      final addressFields =
+          find.widgetWithText(TextFormField, 'Modbus address');
+      if (!duplicateOnLoad) {
+        await tester.enterText(addressFields.at(1), '11');
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      }
+      const duplicateError =
+          'Modbus address вже використовується датчиком вологості.';
+      expect(find.text(duplicateError), findsNWidgets(2));
+
+      final sensorChoice = find.widgetWithText(
+        DropdownButtonFormField<int>,
+        'Привʼязаний датчик вологості',
+      );
+      final sensorDropdown = find.descendant(
+        of: sensorChoice,
+        matching: find.byType(DropdownButton<int>),
+      );
+      expect(
+        tester
+            .widget<DropdownButton<int>>(sensorDropdown)
+            .items!
+            .map((item) => item.value),
+        [11],
+      );
+      await tester.tap(sensorChoice);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Датчик А').last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      await tester.enterText(addressFields.at(1), '12');
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text(duplicateError), findsNothing);
+      expect(
+        tester
+            .widget<DropdownButton<int>>(sensorDropdown)
+            .items!
+            .map((item) => item.value),
+        [11, 12],
+      );
+      expect(tester.state<FormFieldState<int>>(sensorChoice).value, 11);
+    });
+  }
+
   test('builds typed payload for PUT /api/settings', () async {
     final client = RecordingSettingsApiClient();
     final repository = ControllerSettingsRepository(apiClient: client);

@@ -661,6 +661,14 @@ class _ValvesEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final soilSensorNamesByAddress = <int, String>{};
+    for (final sensor in draft.soilSensors) {
+      final address = sensor.parsedSlaveAddress;
+      if (address != null) {
+        soilSensorNamesByAddress.putIfAbsent(address, () => sensor.name);
+      }
+    }
+
     return _Section(
       scrollKey: keyFor('valves'),
       title: 'Клапани',
@@ -704,11 +712,8 @@ class _ValvesEditor extends StatelessWidget {
                 KeyedSubtree(
                   key: keyFor('valves.$i.soilSensorSlaveAddress'),
                   child: DropdownButtonFormField<int>(
-                    initialValue: draft.soilSensors.any(
-                      (sensor) =>
-                          sensor.parsedSlaveAddress ==
-                          draft.valves[i].soilSensorSlaveAddress,
-                    )
+                    initialValue: soilSensorNamesByAddress
+                            .containsKey(draft.valves[i].soilSensorSlaveAddress)
                         ? draft.valves[i].soilSensorSlaveAddress
                         : null,
                     decoration: InputDecoration(
@@ -716,15 +721,13 @@ class _ValvesEditor extends StatelessWidget {
                       labelText: 'Привʼязаний датчик вологості',
                       errorText: validation['valves.$i.soilSensorSlaveAddress'],
                     ),
-                    items: draft.soilSensors
-                        .where((sensor) => sensor.parsedSlaveAddress != null)
-                        .map(
-                          (sensor) => DropdownMenuItem(
-                            value: sensor.parsedSlaveAddress,
-                            child: Text(sensor.name),
-                          ),
-                        )
-                        .toList(),
+                    items: [
+                      for (final sensor in soilSensorNamesByAddress.entries)
+                        DropdownMenuItem(
+                          value: sensor.key,
+                          child: Text(sensor.value),
+                        ),
+                    ],
                     onChanged: enabled
                         ? (value) => onChanged(() =>
                             draft.valves[i].soilSensorSlaveAddress = value)
