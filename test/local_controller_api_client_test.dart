@@ -9,8 +9,177 @@ import 'package:automatic_watering_mobile/features/local_controller/mdns_control
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 
 void main() {
+  test('read Modbus registers posts authenticated body and parses values',
+      () async {
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final httpClient = _FakeHttpClient(responseBody: {
+      'success': true,
+      'error': null,
+      'data': {
+        'status': 0,
+        'slaveAddress': 11,
+        'registerAddress': 256,
+        'quantity': 2,
+        'values': [123, 65535],
+      },
+    });
+    final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
+      httpClient: httpClient,
+      diagnosticsLog: diagnosticsLog,
+    );
+
+    final result = await client.readModbusRegisters(
+      hostname: 'watering-hub.local',
+      apiAccessToken: 'token',
+      request: const ModbusRegisterReadRequest(
+        slaveAddress: 11,
+        registerAddress: 256,
+        quantity: 2,
+      ),
+    );
+
+    expect(httpClient.lastMethod, 'POST');
+    expect(httpClient.lastUri.toString(),
+        'https://192.168.1.42/api/modbus/register/get');
+    expect(httpClient.lastAuthorization, 'Bearer token');
+    expect(httpClient.lastRequestBody,
+        {'slaveAddress': 11, 'registerAddress': 256, 'quantity': 2});
+    expect(result.status, 0);
+    expect(result.slaveAddress, 11);
+    expect(result.registerAddress, 256);
+    expect(result.quantity, 2);
+    expect(result.values, [123, 65535]);
+    expect(() => result.values.clear(), throwsUnsupportedError);
+    expect(diagnosticsLog.entries, isEmpty);
+  });
+
+  test('Modbus read preserves controller-provided integer data', () async {
+    final diagnosticsLog = InMemoryDiagnosticsLog();
+    final client = HttpLocalControllerApiClient(
+      addressService:
+          ControllerAddressService(mdnsControllerResolver: _Resolver()),
+      httpClient: _FakeHttpClient(responseBody: {
+        'success': true,
+        'error': null,
+        'data': {
+          'status': 0,
+          'slaveAddress': 256,
+          'registerAddress': 65535,
+          'quantity': 65,
+          'values': [-1, 65536],
+        },
+      }),
+      diagnosticsLog: diagnosticsLog,
+    );
+
+    final result = await client.readModbusRegisters(
+      hostname: 'watering-hub.local',
+      apiAccessToken: 'token',
+      request: const ModbusRegisterReadRequest(
+        slaveAddress: 256,
+        registerAddress: 65535,
+        quantity: 65,
+      ),
+    );
+
+    expect(result.slaveAddress, 256);
+    expect(result.registerAddress, 65535);
+    expect(result.quantity, 65);
+    expect(result.values, [-1, 65536]);
+    expect(diagnosticsLog.entries, isEmpty);
+  });
+
+  for (final data in <Object?>[
+    null,
+    {},
+    {'status': 226},
+    ...[
+      {'status': 226},
+      {'values': null},
+      {
+        'values': [123, '456']
+      },
+    ].map((overrides) => <String, Object?>{
+          'status': 0,
+          'slaveAddress': 11,
+          'registerAddress': 256,
+          'quantity': 2,
+          'values': [123, 456],
+          ...overrides,
+        }),
+  ]) {
+    test('Modbus read rejects malformed or failed data $data', () async {
+      final diagnosticsLog = InMemoryDiagnosticsLog();
+      final client = HttpLocalControllerApiClient(
+        addressService:
+            ControllerAddressService(mdnsControllerResolver: _Resolver()),
+        httpClient: _FakeHttpClient(responseBody: {
+          'success': true,
+          'error': null,
+          'data': data,
+        }),
+        diagnosticsLog: diagnosticsLog,
+      );
+
+      await expectLater(
+        client.readModbusRegisters(
+          hostname: 'watering-hub.local',
+          apiAccessToken: 'token',
+          request: const ModbusRegisterReadRequest(
+            slaveAddress: 11,
+            registerAddress: 256,
+            quantity: 2,
+          ),
+        ),
+        throwsA(isA<LocalControllerApiException>()),
+      );
+      expect(diagnosticsLog.entries.single.path, '/api/modbus/register/get');
+      expect(diagnosticsLog.entries.single.responseBody, isNotNull);
+    });
+  }
+
+  for (final statusCode in [200, 401, 502]) {
+    test('Modbus read logs rejection with HTTP $statusCode', () async {
+      final diagnosticsLog = InMemoryDiagnosticsLog();
+      final httpClient = _FakeHttpClient(
+        statusCode: statusCode,
+        responseBody: {
+          'success': false,
+          'error': 'Failed to read Modbus register',
+          'data': {'status': 226},
+        },
+      );
+      final client = HttpLocalControllerApiClient(
+        addressService:
+            ControllerAddressService(mdnsControllerResolver: _Resolver()),
+        httpClient: httpClient,
+        diagnosticsLog: diagnosticsLog,
+      );
+
+      await expectLater(
+        client.readModbusRegisters(
+          hostname: 'watering-hub.local',
+          apiAccessToken: 'token',
+          request: const ModbusRegisterReadRequest(
+            slaveAddress: 1,
+            registerAddress: 0,
+            quantity: 1,
+          ),
+        ),
+        throwsA(isA<LocalControllerApiException>()),
+      );
+      expect(httpClient.requestBodies, hasLength(1));
+      expect(diagnosticsLog.entries.single.path, '/api/modbus/register/get');
+      expect(diagnosticsLog.entries.single.responseBody,
+          contains('Failed to read Modbus register'));
+    });
+  }
+
   test('close all valves posts authenticated request without a body', () async {
     final httpClient = _FakeHttpClient(responseBody: {
       'success': true,

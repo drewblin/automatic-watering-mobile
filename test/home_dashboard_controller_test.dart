@@ -9,6 +9,7 @@ import 'package:automatic_watering_mobile/features/controller_settings/settings_
 import 'package:automatic_watering_mobile/features/home/home_dashboard_controller.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -374,6 +375,15 @@ class RecordingDashboardApiClient implements LocalControllerApiClient {
     openValvePin = pin;
     openValveSeconds = seconds;
     await openCompletion?.future;
+  }
+
+  @override
+  Future<ModbusRegisterReadResult> readModbusRegisters({
+    required String hostname,
+    required String apiAccessToken,
+    required ModbusRegisterReadRequest request,
+  }) async {
+    throw UnimplementedError();
   }
 
   @override

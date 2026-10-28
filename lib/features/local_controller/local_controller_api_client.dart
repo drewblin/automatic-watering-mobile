@@ -11,6 +11,7 @@ import '../diagnostics/diagnostics_log.dart';
 import '../sensors/sensor_metric.dart';
 import 'controller_address_service.dart';
 import 'modbus_address_change_models.dart';
+import 'modbus_register_read_models.dart';
 
 class LocalControllerApiException implements Exception {
   const LocalControllerApiException();
@@ -61,6 +62,12 @@ abstract interface class LocalControllerApiClient {
     required String hostname,
     required String apiAccessToken,
     required ModbusRegisterWriteRequest request,
+  });
+
+  Future<ModbusRegisterReadResult> readModbusRegisters({
+    required String hostname,
+    required String apiAccessToken,
+    required ModbusRegisterReadRequest request,
   });
 }
 
@@ -178,6 +185,20 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       apiAccessToken: apiAccessToken,
       body: request.toJson(),
       parse: _handleModbusRegisterWriteResponse,
+    );
+  }
+
+  @override
+  Future<ModbusRegisterReadResult> readModbusRegisters({
+    required String hostname,
+    required String apiAccessToken,
+    required ModbusRegisterReadRequest request,
+  }) {
+    return _send(
+      request: _ControllerRequest.post(hostname, '/api/modbus/register/get'),
+      apiAccessToken: apiAccessToken,
+      body: request.toJson(),
+      parse: _handleModbusRegisterReadResponse,
     );
   }
 
@@ -319,6 +340,31 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
         if (result.status != 0) {
           throw FormatException(
               'Failed to write Modbus register: status ${result.status}');
+        }
+        return result;
+      },
+    );
+  }
+
+  Future<ModbusRegisterReadResult> _handleModbusRegisterReadResponse(
+    HttpClientResponse response,
+    _ControllerRequest request,
+  ) async {
+    final body = await _ensureOkBody(response, request);
+    return _parseEnvelope(
+      body: body,
+      statusCode: response.statusCode,
+      request: request,
+      label: 'Modbus register read',
+      parseData: (data) {
+        if (data is! Map<String, Object?>) {
+          throw const FormatException(
+              'Modbus register read data must be an object');
+        }
+        final result = ModbusRegisterReadResult.fromJson(data);
+        if (result.status != 0) {
+          throw FormatException(
+              'Failed to read Modbus registers: status ${result.status}');
         }
         return result;
       },

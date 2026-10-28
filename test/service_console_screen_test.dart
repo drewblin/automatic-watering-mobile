@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:automatic_watering_mobile/app/app_state.dart';
+import 'package:automatic_watering_mobile/app/app_state_store.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_constants.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_models.dart';
 import 'package:automatic_watering_mobile/features/ble/ble_service.dart';
@@ -9,10 +11,12 @@ import 'package:automatic_watering_mobile/features/controller_settings/settings_
 import 'package:automatic_watering_mobile/features/diagnostics/diagnostics_log.dart';
 import 'package:automatic_watering_mobile/features/local_controller/local_controller_api_client.dart';
 import 'package:automatic_watering_mobile/features/local_controller/modbus_address_change_models.dart';
+import 'package:automatic_watering_mobile/features/local_controller/modbus_register_read_models.dart';
 import 'package:automatic_watering_mobile/features/onboarding/wifi_provisioning_models.dart';
 import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/modbus_address/modbus_address_change_controller.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_register_read/modbus_register_read_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_screen.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
@@ -30,8 +34,176 @@ void main() {
 
     expect(find.text('Сервісна консоль'), findsOneWidget);
     expect(find.text('Діагностика'), findsOneWidget);
-    expect(tester.widget<Tab>(find.byType(Tab).last).text, 'Modbus регістр');
+    expect(find.text('Modbus регістр'), findsOneWidget);
+    expect(find.text('Читання Modbus'), findsOneWidget);
     expect(find.text('Діагностичних записів немає.'), findsOneWidget);
+  });
+
+  testWidgets('separate Modbus read tab has single-register defaults',
+      (tester) async {
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+    ));
+    await _openRegisterReadTab(tester);
+
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields, hasLength(3));
+    expect(fields[0].decoration?.labelText, 'Адреса пристрою');
+    expect(fields[1].controller?.text, '0');
+    expect(fields[2].decoration?.labelText, 'Кількість регістрів');
+    expect(fields[2].controller?.text, '1');
+    expect(find.widgetWithText(FilledButton, 'Прочитати'), findsOneWidget);
+    expect(
+        find.widgetWithText(FilledButton, 'Записати в регістр'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pump();
+    expect(find.text('Активний контролер ще не налаштовано.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'read results show register addresses and values on a narrow phone',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final apiClient = FakeLocalControllerApiClient()
+      ..readResult = ModbusRegisterReadResult(
+        status: 0,
+        slaveAddress: 11,
+        registerAddress: 256,
+        quantity: 2,
+        values: [123, 456],
+      );
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+      localControllerApiClient: apiClient,
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
+    await _fillRegisterReadForm(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pumpAndSettle();
+
+    expect(apiClient.readRequests.single.toJson(),
+        {'slaveAddress': 11, 'registerAddress': 256, 'quantity': 2});
+    expect(find.text('Пристрій: 11'), findsOneWidget);
+    expect(
+        find.descendant(of: find.byType(DataTable), matching: find.text('256')),
+        findsOneWidget);
+    expect(find.text('257'), findsOneWidget);
+    expect(find.text('123'), findsOneWidget);
+    expect(find.text('456'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.text('Modbus регістр'));
+    await tester.tap(find.text('Modbus регістр'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, 'Записати в регістр'),
+        findsOneWidget);
+  });
+
+  testWidgets('read form sends numeric input without range validation',
+      (tester) async {
+    final apiClient = FakeLocalControllerApiClient()
+      ..readException = const LocalControllerApiException();
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+      localControllerApiClient: apiClient,
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
+    await _openRegisterReadTab(tester);
+    await tester.enterText(find.byType(TextField).at(0), '-1');
+    await tester.enterText(find.byType(TextField).at(1), '65535');
+    await tester.enterText(find.byType(TextField).at(2), '65');
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pumpAndSettle();
+
+    expect(apiClient.readRequests.single.toJson(),
+        {'slaveAddress': -1, 'registerAddress': 65535, 'quantity': 65});
+    expect(find.text('Не вдалося прочитати регістри.'), findsOneWidget);
+  });
+
+  testWidgets('read form disables controls until the request completes',
+      (tester) async {
+    final completer = Completer<ModbusRegisterReadResult>();
+    final apiClient = FakeLocalControllerApiClient()
+      ..readFuture = completer.future;
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+      localControllerApiClient: apiClient,
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
+    await _fillRegisterReadForm(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull);
+    expect(
+        tester.widgetList<TextField>(find.byType(TextField)),
+        everyElement(isA<TextField>()
+            .having((field) => field.enabled, 'enabled', false)));
+    expect(apiClient.readRequests, hasLength(1));
+
+    completer.complete(ModbusRegisterReadResult(
+      status: 0,
+      slaveAddress: 11,
+      registerAddress: 256,
+      quantity: 2,
+      values: [123, 456],
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull);
+  });
+
+  testWidgets('read failure preserves inputs and permits retry',
+      (tester) async {
+    final apiClient = FakeLocalControllerApiClient()
+      ..readException = const LocalControllerConnectionException();
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+      localControllerApiClient: apiClient,
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
+    await _fillRegisterReadForm(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Не вдалося прочитати регістри.'), findsOneWidget);
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields.map((field) => field.controller?.text), ['11', '256', '2']);
+    apiClient.readException = null;
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pumpAndSettle();
+    expect(apiClient.readRequests, hasLength(2));
+    expect(find.text('Не вдалося прочитати регістри.'), findsNothing);
+    expect(find.text('Пристрій: 11'), findsOneWidget);
+  });
+
+  testWidgets('read without a configured hub shows an inline error',
+      (tester) async {
+    final apiClient = FakeLocalControllerApiClient();
+    await tester.pumpWidget(_TestApp(
+      diagnosticsLog: InMemoryDiagnosticsLog(),
+      bleService: FakeBleService(),
+      localControllerApiClient: apiClient,
+    ));
+    await _fillRegisterReadForm(tester);
+    await tester.tap(find.widgetWithText(FilledButton, 'Прочитати'));
+    await tester.pumpAndSettle();
+    expect(find.text('Активний контролер ще не налаштовано.'), findsOneWidget);
+    expect(apiClient.readRequests, isEmpty);
   });
 
   testWidgets('shows Modbus register write form', (tester) async {
@@ -404,6 +576,9 @@ class _TestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final apiClient =
         localControllerApiClient ?? FakeLocalControllerApiClient();
+    final stateStore = AppStateStore()
+      ..setState(
+          AppState.readyForOnboarding(activeWateringHub: activeWateringHub));
     return MaterialApp(
       home: ServiceConsoleScreen(
         dependencies: ServiceConsoleDependencies(
@@ -419,6 +594,10 @@ class _TestApp extends StatelessWidget {
             apiClient: apiClient,
             activeControllerAccessProvider: () =>
                 activeWateringHub?.readyAccess,
+          ),
+          modbusRegisterReadController: ModbusRegisterReadController(
+            stateStore: stateStore,
+            apiClient: apiClient,
           ),
         ),
       ),
@@ -452,6 +631,19 @@ Future<void> _fillRegisterWriteForm(
   await tester.enterText(find.byType(TextField).at(0), slave);
   await tester.enterText(find.byType(TextField).at(1), register);
   await tester.enterText(find.byType(TextField).at(2), value);
+}
+
+Future<void> _openRegisterReadTab(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Читання Modbus'));
+  await tester.tap(find.text('Читання Modbus'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _fillRegisterReadForm(WidgetTester tester) async {
+  await _openRegisterReadTab(tester);
+  await tester.enterText(find.byType(TextField).at(0), '11');
+  await tester.enterText(find.byType(TextField).at(1), '256');
+  await tester.enterText(find.byType(TextField).at(2), '2');
 }
 
 Future<void> _tapWriteRegisterFormButton(WidgetTester tester) {
@@ -570,6 +762,12 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   final LocalControllerApiException? exception;
   ModbusRegisterWriteRequest? writtenRequest;
+  final readRequests = <ModbusRegisterReadRequest>[];
+  ModbusRegisterReadResult? readResult;
+  Future<ModbusRegisterReadResult>? readFuture;
+  Object? readException;
+  String? readHostname;
+  String? readApiAccessToken;
 
   @override
   Future<void> checkSettingsAccess({
@@ -613,6 +811,28 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     required int pin,
     required int seconds,
   }) async {}
+
+  @override
+  Future<ModbusRegisterReadResult> readModbusRegisters({
+    required String hostname,
+    required String apiAccessToken,
+    required ModbusRegisterReadRequest request,
+  }) async {
+    readRequests.add(request);
+    readHostname = hostname;
+    readApiAccessToken = apiAccessToken;
+    final error = readException;
+    if (error != null) throw error;
+    return readFuture ??
+        Future.value(readResult ??
+            ModbusRegisterReadResult(
+              status: 0,
+              slaveAddress: request.slaveAddress,
+              registerAddress: request.registerAddress,
+              quantity: request.quantity,
+              values: List.filled(request.quantity, 0),
+            ));
+  }
 
   @override
   Future<ModbusRegisterWriteResult> writeModbusRegister({

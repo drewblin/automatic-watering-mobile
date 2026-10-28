@@ -42,6 +42,7 @@ class AppController extends ChangeNotifier {
     _stateStore.removeListener(notifyListeners);
     serviceConsoleDependencies.bleLogsController.dispose();
     serviceConsoleDependencies.modbusRegisterWriteController.dispose();
+    serviceConsoleDependencies.modbusRegisterReadController.dispose();
     settingsSaveController.dispose();
     homeDashboardController.dispose();
     _stateStore.dispose();

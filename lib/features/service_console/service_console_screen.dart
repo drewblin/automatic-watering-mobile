@@ -21,6 +21,8 @@ class ServiceConsoleScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Сервісна консоль'),
           bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               for (final tab in tabs) Tab(text: tab.label),
             ],
