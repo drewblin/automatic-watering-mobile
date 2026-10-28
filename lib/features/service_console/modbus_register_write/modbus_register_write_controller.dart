@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/app_state_store.dart';
 import '../../local_controller/local_controller_api_client.dart';
 import '../../local_controller/modbus_register_write_models.dart';
+import '../modbus_register_validation.dart';
 
 enum ModbusRegisterWriteStatus {
   idle,
@@ -39,6 +40,7 @@ class ModbusRegisterWriteController extends ChangeNotifier {
   final AppStateStore _stateStore;
   final LocalControllerApiClient _apiClient;
   ModbusRegisterWriteState _state = const ModbusRegisterWriteState.idle();
+  bool _disposed = false;
 
   ModbusRegisterWriteState get state => _state;
 
@@ -47,7 +49,7 @@ class ModbusRegisterWriteController extends ChangeNotifier {
     required String registerAddressText,
     required String valueText,
   }) async {
-    if (_state.isSubmitting) {
+    if (_disposed || _state.isSubmitting) {
       return false;
     }
 
@@ -79,6 +81,7 @@ class ModbusRegisterWriteController extends ChangeNotifier {
         apiAccessToken: access.apiAccessToken,
         request: request,
       );
+      if (_disposed) return false;
       _setState(ModbusRegisterWriteState(
         status: ModbusRegisterWriteStatus.success,
         message:
@@ -112,29 +115,29 @@ class ModbusRegisterWriteController extends ChangeNotifier {
     required String registerAddressText,
     required String valueText,
   }) {
-    final slaveAddress = _readUint8(slaveAddressText);
+    final slaveAddress = parseModbusUint8(slaveAddressText);
     if (slaveAddress == null) {
       _setState(const ModbusRegisterWriteState(
         status: ModbusRegisterWriteStatus.invalid,
-        message: 'Адреса пристрою має бути від 0 до 255.',
+        message: modbusSlaveAddressError,
       ));
       return null;
     }
 
-    final registerAddress = _readUint16(registerAddressText);
+    final registerAddress = parseModbusUint16(registerAddressText);
     if (registerAddress == null) {
       _setState(const ModbusRegisterWriteState(
         status: ModbusRegisterWriteStatus.invalid,
-        message: 'Адреса регістра має бути від 0 до 65535.',
+        message: modbusRegisterAddressError,
       ));
       return null;
     }
 
-    final value = _readUint16(valueText);
+    final value = parseModbusUint16(valueText);
     if (value == null) {
       _setState(const ModbusRegisterWriteState(
         status: ModbusRegisterWriteStatus.invalid,
-        message: 'Значення має бути від 0 до 65535.',
+        message: modbusRegisterValueError,
       ));
       return null;
     }
@@ -147,23 +150,14 @@ class ModbusRegisterWriteController extends ChangeNotifier {
   }
 
   void _setState(ModbusRegisterWriteState state) {
+    if (_disposed) return;
     _state = state;
     notifyListeners();
   }
-}
 
-int? _readUint8(String value) {
-  final parsed = int.tryParse(value.trim());
-  if (parsed == null || parsed < 0 || parsed > 255) {
-    return null;
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
-  return parsed;
-}
-
-int? _readUint16(String value) {
-  final parsed = int.tryParse(value.trim());
-  if (parsed == null || parsed < 0 || parsed > 65535) {
-    return null;
-  }
-  return parsed;
 }

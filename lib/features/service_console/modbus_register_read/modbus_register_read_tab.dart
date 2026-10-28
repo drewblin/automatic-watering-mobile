@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../local_controller/modbus_register_read_models.dart';
+import '../modbus_register_fields.dart';
 import 'modbus_register_read_controller.dart';
 
 class ModbusRegisterReadTab extends StatefulWidget {
@@ -18,31 +19,11 @@ class _ModbusRegisterReadTabState extends State<ModbusRegisterReadTab> {
   final _quantityController = TextEditingController(text: '1');
 
   @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_refresh);
-  }
-
-  @override
-  void didUpdateWidget(ModbusRegisterReadTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.controller != oldWidget.controller) {
-      oldWidget.controller.removeListener(_refresh);
-      widget.controller.addListener(_refresh);
-    }
-  }
-
-  @override
   void dispose() {
-    widget.controller.removeListener(_refresh);
     _slaveAddressController.dispose();
     _registerAddressController.dispose();
     _quantityController.dispose();
     super.dispose();
-  }
-
-  void _refresh() {
-    if (mounted) setState(() {});
   }
 
   Future<void> _submit() async {
@@ -55,6 +36,13 @@ class _ModbusRegisterReadTabState extends State<ModbusRegisterReadTab> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: _buildForm,
+    );
+  }
+
+  Widget _buildForm(BuildContext context, Widget? child) {
     final state = widget.controller.state;
     final message = state.message;
     final result = state.result;
@@ -65,35 +53,17 @@ class _ModbusRegisterReadTabState extends State<ModbusRegisterReadTab> {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 16),
-          TextField(
-            controller: _slaveAddressController,
-            decoration: const InputDecoration(
-              labelText: 'Адреса пристрою',
-              border: OutlineInputBorder(),
-            ),
+          ModbusRegisterAddressFields(
+            slaveAddressController: _slaveAddressController,
+            registerAddressController: _registerAddressController,
             enabled: !state.isSubmitting,
-            keyboardType: const TextInputType.numberWithOptions(signed: true),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _registerAddressController,
-            decoration: const InputDecoration(
-              labelText: 'Адреса регістра',
-              border: OutlineInputBorder(),
-            ),
-            enabled: !state.isSubmitting,
-            keyboardType: const TextInputType.numberWithOptions(signed: true),
-          ),
-          const SizedBox(height: 12),
-          TextField(
+          ModbusRegisterNumberField(
             controller: _quantityController,
-            decoration: const InputDecoration(
-              labelText: 'Кількість регістрів',
-              helperText: 'Від 1 до 64',
-              border: OutlineInputBorder(),
-            ),
+            label: 'Кількість регістрів',
+            helperText: 'Від 1 до 64',
             enabled: !state.isSubmitting,
-            keyboardType: const TextInputType.numberWithOptions(signed: true),
           ),
           const SizedBox(height: 16),
           Align(

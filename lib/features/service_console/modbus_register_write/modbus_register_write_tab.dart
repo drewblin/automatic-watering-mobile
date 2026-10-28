@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../modbus_register_fields.dart';
 import 'modbus_register_write_controller.dart';
 
 class ModbusRegisterWriteTab extends StatefulWidget {
@@ -21,33 +21,11 @@ class _ModbusRegisterWriteTabState extends State<ModbusRegisterWriteTab> {
   final _valueController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_refresh);
-  }
-
-  @override
-  void didUpdateWidget(ModbusRegisterWriteTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.controller != oldWidget.controller) {
-      oldWidget.controller.removeListener(_refresh);
-      widget.controller.addListener(_refresh);
-    }
-  }
-
-  @override
   void dispose() {
-    widget.controller.removeListener(_refresh);
     _slaveAddressController.dispose();
     _registerAddressController.dispose();
     _valueController.dispose();
     super.dispose();
-  }
-
-  void _refresh() {
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   Future<void> _submit() async {
@@ -68,6 +46,13 @@ class _ModbusRegisterWriteTabState extends State<ModbusRegisterWriteTab> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: _buildForm,
+    );
+  }
+
+  Widget _buildForm(BuildContext context, Widget? child) {
     final state = widget.controller.state;
     final message = state.message;
     final validationMessage =
@@ -81,40 +66,20 @@ class _ModbusRegisterWriteTabState extends State<ModbusRegisterWriteTab> {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 16),
-          TextField(
-            controller: _slaveAddressController,
-            decoration: const InputDecoration(
-              labelText: 'Адреса пристрою',
-              border: OutlineInputBorder(),
-            ),
+          ModbusRegisterAddressFields(
+            slaveAddressController: _slaveAddressController,
+            registerAddressController: _registerAddressController,
             enabled: !state.isSubmitting,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => widget.controller.clearValidationMessage(),
+            digitsOnly: true,
+            onChanged: widget.controller.clearValidationMessage,
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _registerAddressController,
-            decoration: const InputDecoration(
-              labelText: 'Адреса регістра',
-              border: OutlineInputBorder(),
-            ),
-            enabled: !state.isSubmitting,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => widget.controller.clearValidationMessage(),
-          ),
-          const SizedBox(height: 12),
-          TextField(
+          ModbusRegisterNumberField(
             controller: _valueController,
-            decoration: const InputDecoration(
-              labelText: 'Значення',
-              border: OutlineInputBorder(),
-            ),
+            label: 'Значення',
             enabled: !state.isSubmitting,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => widget.controller.clearValidationMessage(),
+            digitsOnly: true,
+            onChanged: widget.controller.clearValidationMessage,
           ),
           if (validationMessage != null) ...[
             const SizedBox(height: 12),

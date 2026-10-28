@@ -8,7 +8,6 @@ import 'ble_constants.dart';
 import 'ble_models.dart';
 import 'ble_service.dart';
 import '../onboarding/wifi_provisioning_models.dart';
-import '../../core/api_envelope.dart';
 
 class FlutterReactiveBleService implements BleService {
   FlutterReactiveBleService({FlutterReactiveBle? reactiveBle})
@@ -349,21 +348,14 @@ class FlutterReactiveBleService implements BleService {
     T Function(Object? data) parseData,
     String failureMessage,
   ) {
-    final envelope = _decodeEnvelope<T>(value, parseData);
-    if (!envelope.success) {
-      throw StateError(envelope.error ?? failureMessage);
-    }
-    return envelope.data;
-  }
-
-  ApiEnvelope<T> _decodeEnvelope<T>(
-    List<int> value,
-    T Function(Object? data) parseData,
-  ) {
     final decoded = jsonDecode(utf8.decode(value));
     if (decoded is! Map<String, Object?>) {
       throw const FormatException('BLE response envelope must be an object');
     }
-    return ApiEnvelope<T>.fromJson(decoded, parseData);
+    final success = decoded['success'] as bool? ?? false;
+    if (!success) {
+      throw StateError(decoded['error'] as String? ?? failureMessage);
+    }
+    return parseData(decoded['data']);
   }
 }

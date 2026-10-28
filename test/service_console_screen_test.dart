@@ -17,6 +17,8 @@ import 'package:automatic_watering_mobile/features/sensors/sensor_metric.dart';
 import 'package:automatic_watering_mobile/features/service_console/ble_logs/ble_controller_logs_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/modbus_register_write/modbus_register_write_controller.dart';
 import 'package:automatic_watering_mobile/features/service_console/modbus_register_read/modbus_register_read_controller.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_register_read/modbus_register_read_tab.dart';
+import 'package:automatic_watering_mobile/features/service_console/modbus_register_write/modbus_register_write_tab.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_dependencies.dart';
 import 'package:automatic_watering_mobile/features/service_console/service_console_screen.dart';
 import 'package:automatic_watering_mobile/features/watering_hubs/watering_hub.dart';
@@ -24,6 +26,124 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  for (final isRead in [true, false]) {
+    testWidgets(
+        'Modbus tab preserves inputs when replacing controller (read: $isRead)',
+        (tester) async {
+      final stateStore = AppStateStore();
+      addTearDown(stateStore.dispose);
+      stateStore.setState(AppState.readyForOnboarding(
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ));
+      final apiClient = FakeLocalControllerApiClient();
+      ChangeNotifier createController() => isRead
+          ? ModbusRegisterReadController(
+              stateStore: stateStore, apiClient: apiClient)
+          : ModbusRegisterWriteController(
+              stateStore: stateStore, apiClient: apiClient);
+      Widget screen(ChangeNotifier controller) => MaterialApp(
+            home: Scaffold(
+              body: isRead
+                  ? ModbusRegisterReadTab(
+                      key: null,
+                      controller: controller as ModbusRegisterReadController)
+                  : ModbusRegisterWriteTab(
+                      controller: controller as ModbusRegisterWriteController),
+            ),
+          );
+      final oldController = createController();
+      final newController = createController();
+      addTearDown(newController.dispose);
+      await tester.pumpWidget(screen(oldController));
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '11');
+      await tester.enterText(fields.at(1), '256');
+      await tester.enterText(fields.at(2), '2');
+
+      await tester.pumpWidget(screen(newController));
+      oldController.dispose();
+      expect(
+          tester
+              .widgetList<TextField>(fields)
+              .map((field) => field.controller!.text),
+          ['11', '256', '2']);
+      await tester.tap(find.widgetWithText(
+          FilledButton, isRead ? 'Прочитати' : 'Записати в регістр'));
+      await tester.pumpAndSettle();
+
+      expect(
+          find.text(isRead
+              ? 'Пристрій: 11'
+              : 'Значення 2 записано в регістр 256 пристрою 11.'),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final fails in [false, true]) {
+    test('Modbus write ignores late completion after disposal (fails: $fails)',
+        () async {
+      final stateStore = AppStateStore();
+      addTearDown(stateStore.dispose);
+      stateStore.setState(AppState.readyForOnboarding(
+        activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+      ));
+      final completer = Completer<ModbusRegisterWriteResult>();
+      final apiClient = FakeLocalControllerApiClient()
+        ..writeFuture = completer.future;
+      final controller = ModbusRegisterWriteController(
+        stateStore: stateStore,
+        apiClient: apiClient,
+      );
+      var notifications = 0;
+      controller.addListener(() => notifications++);
+      final pending = controller.submit(
+        slaveAddressText: '11',
+        registerAddressText: '256',
+        valueText: '12',
+      );
+      expect(notifications, 1);
+      controller.dispose();
+      if (fails) {
+        completer.completeError(const LocalControllerApiException());
+      } else {
+        completer.complete(const ModbusRegisterWriteResult(
+          status: 0,
+          slaveAddress: 11,
+          registerAddress: 256,
+          value: 12,
+        ));
+      }
+
+      expect(await pending, isFalse);
+      expect(notifications, 1);
+      expect(controller.state.status, ModbusRegisterWriteStatus.submitting);
+    });
+  }
+
+  test('Modbus write rejects submission after disposal', () async {
+    final stateStore = AppStateStore();
+    addTearDown(stateStore.dispose);
+    stateStore.setState(AppState.readyForOnboarding(
+      activeWateringHub: _hub(bleDeviceId: 'ble-42'),
+    ));
+    final apiClient = FakeLocalControllerApiClient();
+    final controller = ModbusRegisterWriteController(
+      stateStore: stateStore,
+      apiClient: apiClient,
+    );
+    controller.dispose();
+
+    expect(
+        await controller.submit(
+          slaveAddressText: '11',
+          registerAddressText: '256',
+          valueText: '12',
+        ),
+        isFalse);
+    expect(apiClient.writtenRequest, isNull);
+  });
+
   test('Modbus write uses current controller access from app state', () async {
     final stateStore = AppStateStore();
     final apiClient = FakeLocalControllerApiClient();
@@ -797,6 +917,7 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
 
   final LocalControllerApiException? exception;
   ModbusRegisterWriteRequest? writtenRequest;
+  Future<ModbusRegisterWriteResult>? writeFuture;
   String? writtenHostname;
   String? writtenApiAccessToken;
   final readRequests = <ModbusRegisterReadRequest>[];
@@ -884,11 +1005,12 @@ class FakeLocalControllerApiClient implements LocalControllerApiClient {
     writtenRequest = request;
     writtenHostname = hostname;
     writtenApiAccessToken = apiAccessToken;
-    return ModbusRegisterWriteResult(
-      status: 0,
-      slaveAddress: request.slaveAddress,
-      value: request.value,
-      registerAddress: request.registerAddress,
-    );
+    return writeFuture ??
+        ModbusRegisterWriteResult(
+          status: 0,
+          slaveAddress: request.slaveAddress,
+          value: request.value,
+          registerAddress: request.registerAddress,
+        );
   }
 }

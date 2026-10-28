@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/app_state_store.dart';
 import '../../local_controller/local_controller_api_client.dart';
 import '../../local_controller/modbus_register_read_models.dart';
+import '../modbus_register_validation.dart';
 
 enum ModbusRegisterReadStatus { idle, submitting, success, failure }
 
@@ -57,19 +58,17 @@ class ModbusRegisterReadController extends ChangeNotifier {
       return false;
     }
 
-    final slaveAddress = int.tryParse(slaveAddressText.trim());
-    if (slaveAddress == null || slaveAddress < 0 || slaveAddress > 255) {
-      return _rejectRequest('Адреса пристрою має бути від 0 до 255.');
+    final slaveAddress = parseModbusUint8(slaveAddressText);
+    if (slaveAddress == null) {
+      return _rejectRequest(modbusSlaveAddressError);
     }
-    final registerAddress = int.tryParse(registerAddressText.trim());
-    if (registerAddress == null ||
-        registerAddress < 0 ||
-        registerAddress > 65535) {
-      return _rejectRequest('Адреса регістра має бути від 0 до 65535.');
+    final registerAddress = parseModbusUint16(registerAddressText);
+    if (registerAddress == null) {
+      return _rejectRequest(modbusRegisterAddressError);
     }
-    final quantity = int.tryParse(quantityText.trim());
-    if (quantity == null || quantity < 1 || quantity > 64) {
-      return _rejectRequest('Кількість регістрів має бути від 1 до 64.');
+    final quantity = parseModbusQuantity(quantityText);
+    if (quantity == null) {
+      return _rejectRequest(modbusRegisterQuantityError);
     }
 
     _setState(const ModbusRegisterReadState(

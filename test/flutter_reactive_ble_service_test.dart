@@ -41,6 +41,63 @@ void main() {
         AutomaticWateringBleConstants.saveWifiSettings.uuid);
   });
 
+  final envelopeOperations = <String, Future<Object> Function()>{
+    'Wi-Fi settings': () => service.readWifiSettings('hub'),
+    'IP address': () => service.readWifiIpAddress('hub'),
+    'API token': () => service.readApiAccessToken('hub'),
+    'Wi-Fi save': save,
+  };
+  for (final operation in envelopeOperations.entries) {
+    for (final data in [null, <String, Object?>{}, 'invalid data']) {
+      test('${operation.key} preserves controller rejection with data $data',
+          () async {
+        transport.response = jsonEncode({
+          'success': false,
+          'data': data,
+          'error': 'Controller rejected operation',
+        });
+
+        await expectLater(
+          operation.value(),
+          throwsA(isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'Controller rejected operation',
+          )),
+        );
+      });
+    }
+  }
+
+  for (final response in [
+    {'success': false},
+    {'success': null, 'data': null, 'error': null},
+    {'data': null},
+  ]) {
+    test('Wi-Fi save uses rejection fallback for envelope $response', () async {
+      transport.response = jsonEncode(response);
+
+      await expectLater(
+        save(),
+        throwsA(isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Wi-Fi settings save failed',
+        )),
+      );
+    });
+  }
+
+  test('successful Wi-Fi save ignores the unused error field', () async {
+    transport.response = jsonEncode({
+      'success': true,
+      'data': {'restartScheduled': true},
+      'error': 42,
+    });
+
+    expect((await save()).restartScheduled, isTrue);
+  });
+
   for (final response in [
     '{"success":false,"data":{},"error":"Save failed"}',
     '{"success":false,"data":{"restartScheduled":true},"error":"Save failed"}',

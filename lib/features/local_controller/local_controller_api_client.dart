@@ -111,7 +111,10 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     return _send(
       request: _ControllerRequest.get(hostname, '/api/settings'),
       apiAccessToken: apiAccessToken,
-      parse: _handleSettingsResponse,
+      parse: _objectResponseParser(
+        label: 'Settings',
+        parseData: SettingsResponseData.fromJson,
+      ),
     );
   }
 
@@ -125,7 +128,16 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       request: _ControllerRequest.put(hostname, '/api/settings'),
       apiAccessToken: apiAccessToken,
       body: settings.toJson(),
-      parse: _handleSettingsSaveResponse,
+      parse: _responseParser<void>(
+        label: 'Settings save',
+        parseData: (data) {
+          if (data is! Map<String, Object?> ||
+              data['restartScheduled'] != true) {
+            throw const FormatException(
+                'Settings save did not confirm restart');
+          }
+        },
+      ),
     );
   }
 
@@ -137,7 +149,10 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     return _send(
       request: _ControllerRequest.get(hostname, '/api/sensors/metrics'),
       apiAccessToken: apiAccessToken,
-      parse: _handleSensorMetricsResponse,
+      parse: _objectResponseParser(
+        label: 'Metrics',
+        parseData: _parseSensorMetrics,
+      ),
     );
   }
 
@@ -155,7 +170,7 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       ),
       apiAccessToken: apiAccessToken,
       body: {'pin': pin, 'seconds': seconds},
-      parse: _handleEmptyResponse,
+      parse: _responseParser<void>(label: 'Empty', parseData: (_) {}),
     );
   }
 
@@ -167,7 +182,7 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     return _send(
       request: _ControllerRequest.post(hostname, '/api/valves/close-all'),
       apiAccessToken: apiAccessToken,
-      parse: _handleEmptyResponse,
+      parse: _responseParser<void>(label: 'Empty', parseData: (_) {}),
     );
   }
 
@@ -184,7 +199,14 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       ),
       apiAccessToken: apiAccessToken,
       body: request.toJson(),
-      parse: _handleModbusRegisterWriteResponse,
+      parse: _objectResponseParser(
+        label: 'Modbus register write',
+        parseData: (data) {
+          final result = ModbusRegisterWriteResult.fromJson(data);
+          _ensureModbusSuccess(result.status, 'write Modbus register');
+          return result;
+        },
+      ),
     );
   }
 
@@ -198,7 +220,14 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
       request: _ControllerRequest.post(hostname, '/api/modbus/register/get'),
       apiAccessToken: apiAccessToken,
       body: request.toJson(),
-      parse: _handleModbusRegisterReadResponse,
+      parse: _objectResponseParser(
+        label: 'Modbus register read',
+        parseData: (data) {
+          final result = ModbusRegisterReadResult.fromJson(data);
+          _ensureModbusSuccess(result.status, 'read Modbus registers');
+          return result;
+        },
+      ),
     );
   }
 
@@ -288,141 +317,60 @@ class HttpLocalControllerApiClient implements LocalControllerApiClient {
     };
   }
 
-  Future<SettingsResponseData> _handleSettingsResponse(
-    HttpClientResponse response,
-    _ControllerRequest request,
-  ) async {
-    final body = await _ensureOkBody(response, request);
-    return _parseEnvelope(
-      body: body,
-      statusCode: response.statusCode,
-      request: request,
-      label: 'Settings',
+  _ResponseParser<T> _objectResponseParser<T>({
+    required String label,
+    required T Function(Map<String, Object?> data) parseData,
+  }) {
+    return _responseParser(
+      label: label,
       parseData: (data) {
         if (data is! Map<String, Object?>) {
-          throw const FormatException('Settings data must be an object');
+          throw FormatException('$label data must be an object');
         }
-        return SettingsResponseData.fromJson(data);
+        return parseData(data);
       },
     );
   }
 
-  Future<void> _handleSettingsSaveResponse(
-    HttpClientResponse response,
-    _ControllerRequest request,
-  ) async {
-    final body = await _ensureOkBody(response, request);
-    _parseEnvelope<Object?>(
-      body: body,
-      statusCode: response.statusCode,
-      request: request,
-      label: 'Settings save',
-      parseData: (data) {
-        if (data is! Map<String, Object?> || data['restartScheduled'] != true) {
-          throw const FormatException('Settings save did not confirm restart');
-        }
-        return null;
-      },
-    );
+  _ResponseParser<T> _responseParser<T>({
+    required String label,
+    required T Function(Object? data) parseData,
+  }) {
+    return (response, request) async {
+      final body = await _ensureOkBody(response, request);
+      return _parseEnvelope(
+        body: body,
+        statusCode: response.statusCode,
+        request: request,
+        label: label,
+        parseData: parseData,
+      );
+    };
   }
 
-  Future<void> _handleEmptyResponse(
-    HttpClientResponse response,
-    _ControllerRequest request,
-  ) async {
-    final body = await _ensureOkBody(response, request);
-    _parseEnvelope<Object?>(
-      body: body,
-      statusCode: response.statusCode,
-      request: request,
-      label: 'Empty',
-      parseData: (_) => null,
-    );
+  void _ensureModbusSuccess(int status, String operation) {
+    if (status != 0) {
+      throw FormatException('Failed to $operation: status $status');
+    }
   }
 
-  Future<ModbusRegisterWriteResult> _handleModbusRegisterWriteResponse(
-    HttpClientResponse response,
-    _ControllerRequest request,
-  ) async {
-    final body = await _ensureOkBody(response, request);
-    return _parseEnvelope(
-      body: body,
-      statusCode: response.statusCode,
-      request: request,
-      label: 'Modbus register write',
-      parseData: (data) {
-        if (data is! Map<String, Object?>) {
-          throw const FormatException(
-              'Modbus register write data must be an object');
-        }
-        final result = ModbusRegisterWriteResult.fromJson(data);
-        if (result.status != 0) {
-          throw FormatException(
-              'Failed to write Modbus register: status ${result.status}');
-        }
-        return result;
-      },
-    );
-  }
-
-  Future<ModbusRegisterReadResult> _handleModbusRegisterReadResponse(
-    HttpClientResponse response,
-    _ControllerRequest request,
-  ) async {
-    final body = await _ensureOkBody(response, request);
-    return _parseEnvelope(
-      body: body,
-      statusCode: response.statusCode,
-      request: request,
-      label: 'Modbus register read',
-      parseData: (data) {
-        if (data is! Map<String, Object?>) {
-          throw const FormatException(
-              'Modbus register read data must be an object');
-        }
-        final result = ModbusRegisterReadResult.fromJson(data);
-        if (result.status != 0) {
-          throw FormatException(
-              'Failed to read Modbus registers: status ${result.status}');
-        }
-        return result;
-      },
-    );
-  }
-
-  Future<List<ControllerSensorMetric>> _handleSensorMetricsResponse(
-    HttpClientResponse response,
-    _ControllerRequest request,
-  ) async {
-    final body = await _ensureOkBody(response, request);
+  List<ControllerSensorMetric> _parseSensorMetrics(Map<String, Object?> data) {
     final receivedAt = DateTime.now().toUtc();
-    return _parseEnvelope(
-      body: body,
-      statusCode: response.statusCode,
-      request: request,
-      label: 'Metrics',
-      parseData: (data) {
-        if (data is! Map<String, Object?>) {
-          throw const FormatException('Metrics data must be an object');
-        }
-        final sensors = data['sensors'];
-        if (sensors is! List) {
-          throw const FormatException('Metrics sensors must be a list');
-        }
-        return sensors
-            .map(
-              (item) => ControllerSensorMetric.fromJson(
-                json: item is Map<String, Object?>
-                    ? item
-                    : throw const FormatException(
-                        'Metrics sensor must be an object',
-                      ),
-                receivedAt: receivedAt,
-              ),
-            )
-            .toList(growable: false);
-      },
-    );
+    final sensors = data['sensors'];
+    if (sensors is! List) {
+      throw const FormatException('Metrics sensors must be a list');
+    }
+    return sensors
+        .map(
+          (item) => ControllerSensorMetric.fromJson(
+            json: item is Map<String, Object?>
+                ? item
+                : throw const FormatException(
+                    'Metrics sensor must be an object'),
+            receivedAt: receivedAt,
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<String> _ensureOkBody(
